@@ -160,6 +160,8 @@ export const api = {
   createServer: (name: string, address: string, labels?: string) =>
     request<Server>("POST", "/servers", { name, address, labels }),
   getServer: (id: string) => request<Server>("GET", `/servers/${id}`),
+  updateServer: (id: string, name: string, address: string, labels?: string) =>
+    request<Server>("PUT", `/servers/${id}`, { name, address, labels }),
   deleteServer: (id: string) =>
     request<{ ok: boolean }>("DELETE", `/servers/${id}`),
   serverStatus: (id: string) =>

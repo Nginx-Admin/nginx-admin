@@ -52,6 +52,35 @@ func (s *Server) handleGetServer(c *gin.Context) {
 	c.JSON(http.StatusOK, srv)
 }
 
+type updateServerReq struct {
+	Name    string `json:"name" binding:"required"`
+	Address string `json:"address" binding:"required"` // host:port
+	Labels  string `json:"labels"`
+}
+
+func (s *Server) handleUpdateServer(c *gin.Context) {
+	srv := s.mustServer(c)
+	if srv == nil {
+		return
+	}
+	var req updateServerReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "参数错误"})
+		return
+	}
+	srv.Name = req.Name
+	srv.Address = req.Address
+	if req.Labels != "" {
+		srv.Labels = req.Labels
+	}
+	if err := s.store.UpdateServer(srv); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	s.audit(currentClaims(c).UserID, srv.ID, "server.update", srv.Name, "success", "")
+	c.JSON(http.StatusOK, srv)
+}
+
 func (s *Server) handleDeleteServer(c *gin.Context) {
 	id := c.Param("id")
 	if err := s.store.DeleteServer(id); err != nil {

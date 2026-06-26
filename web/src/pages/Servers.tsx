@@ -11,6 +11,7 @@ export default function Servers() {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
   const [showCreate, setShowCreate] = useState(false);
+  const [editing, setEditing] = useState<Server | null>(null);
 
   const load = () => {
     setLoading(true);
@@ -64,12 +65,22 @@ export default function Servers() {
                     {s.nginx_version || "-"}
                   </td>
                   <td className="px-4 py-2 text-right">
-                    <Button
-                      variant="secondary"
-                      onClick={() => nav(`/servers/${s.id}`)}
-                    >
-                      管理
-                    </Button>
+                    <div className="inline-flex gap-2">
+                      {isAdmin && (
+                        <Button
+                          variant="secondary"
+                          onClick={() => setEditing(s)}
+                        >
+                          编辑
+                        </Button>
+                      )}
+                      <Button
+                        variant="secondary"
+                        onClick={() => nav(`/servers/${s.id}`)}
+                      >
+                        管理
+                      </Button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -78,11 +89,16 @@ export default function Servers() {
         </div>
       )}
 
-      {showCreate && (
-        <CreateServerModal
-          onClose={() => setShowCreate(false)}
-          onCreated={() => {
+      {(showCreate || editing) && (
+        <ServerModal
+          server={editing}
+          onClose={() => {
             setShowCreate(false);
+            setEditing(null);
+          }}
+          onSaved={() => {
+            setShowCreate(false);
+            setEditing(null);
             load();
           }}
         />
@@ -91,25 +107,37 @@ export default function Servers() {
   );
 }
 
-function CreateServerModal({
+function ServerModal({
+  server,
   onClose,
-  onCreated,
+  onSaved,
 }: {
+  server: Server | null;
   onClose: () => void;
-  onCreated: () => void;
+  onSaved: () => void;
 }) {
-  const [name, setName] = useState("");
-  const [address, setAddress] = useState("");
+  const isEdit = !!server;
+  const [name, setName] = useState(server?.name ?? "");
+  const [address, setAddress] = useState(server?.address ?? "");
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
+    // 简单校验：地址需含端口
+    if (!/:\d+$/.test(address.trim())) {
+      setErr("地址需包含端口，例如 10.0.0.12:7443");
+      return;
+    }
     setBusy(true);
     setErr("");
     try {
-      await api.createServer(name, address);
-      onCreated();
+      if (isEdit && server) {
+        await api.updateServer(server.id, name.trim(), address.trim());
+      } else {
+        await api.createServer(name.trim(), address.trim());
+      }
+      onSaved();
     } catch (e) {
       setErr((e as Error).message);
     } finally {
@@ -123,7 +151,9 @@ function CreateServerModal({
         onSubmit={submit}
         className="w-full max-w-md rounded-xl bg-white p-6 shadow-lg"
       >
-        <h2 className="text-lg font-semibold text-slate-800">新增服务器</h2>
+        <h2 className="text-lg font-semibold text-slate-800">
+          {isEdit ? "编辑服务器" : "新增服务器"}
+        </h2>
         <label className="mt-4 block text-sm font-medium text-slate-700">
           名称
           <input
@@ -153,7 +183,7 @@ function CreateServerModal({
             取消
           </button>
           <Button type="submit" disabled={busy}>
-            {busy ? "创建中..." : "创建"}
+            {busy ? "保存中..." : isEdit ? "保存" : "创建"}
           </Button>
         </div>
       </form>

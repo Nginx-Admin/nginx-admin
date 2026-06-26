@@ -56,6 +56,7 @@ func (s *Server) Router() *gin.Engine {
 			authed.GET("/servers", s.handleListServers)
 			authed.POST("/servers", s.RequireRole("admin"), s.handleCreateServer)
 			authed.GET("/servers/:id", s.handleGetServer)
+			authed.PUT("/servers/:id", s.RequireRole("admin"), s.handleUpdateServer)
 			authed.DELETE("/servers/:id", s.RequireRole("admin"), s.handleDeleteServer)
 			authed.GET("/servers/:id/status", s.handleServerStatus)
 			authed.POST("/servers/:id/discover", s.RequireRole("editor"), s.handleDiscover)
