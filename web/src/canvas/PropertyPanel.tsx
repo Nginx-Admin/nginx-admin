@@ -1,225 +1,187 @@
-import type { ParsedConfig } from "./nginxParser";
-
-type Selection =
-  | { kind: "server"; serverId: string }
-  | { kind: "location"; serverId: string; locationId: string }
-  | { kind: "upstream"; upstreamId: string }
-  | null;
+import {
+  appendChild,
+  getNode,
+  isBlock,
+  isComment,
+  newDirective,
+  removeNode,
+  updateArgs,
+  updateComment,
+  updateDirectiveName,
+  type Directive,
+  type NodePath,
+} from "./directives";
 
 interface Props {
-  parsed: ParsedConfig;
-  selection: Selection;
-  onChange: (next: ParsedConfig) => void;
+  dirs: Directive[];
+  selectedPath: NodePath | null;
+  onChange: (next: Directive[]) => void;
 }
 
-function field(
-  label: string,
-  value: string,
-  onChange: (v: string) => void,
-  placeholder = ""
-) {
+// 递归渲染一个块内部的指令列表，支持编辑参数 / 注释 / 增删。
+function DirectiveList({
+  dirs,
+  basePath,
+  block,
+  onChange,
+}: {
+  dirs: Directive[];
+  basePath: NodePath; // 该 block 节点自身的路径
+  block: Directive[]; // 该 block 的子指令
+  onChange: (next: Directive[]) => void;
+}) {
   return (
-    <label className="block text-xs font-medium text-slate-600">
-      {label}
-      <input
-        className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm"
-        value={value}
-        placeholder={placeholder}
-        onChange={(e) => onChange(e.target.value)}
-      />
-    </label>
-  );
-}
-
-export default function PropertyPanel({ parsed, selection, onChange }: Props) {
-  if (!selection) {
-    return (
-      <div className="p-4 text-sm text-slate-400">
-        在画布上选中一个节点以编辑其属性。
-      </div>
-    );
-  }
-
-  const clone = (): ParsedConfig => JSON.parse(JSON.stringify(parsed));
-
-  if (selection.kind === "server") {
-    const s = parsed.servers.find((x) => x.id === selection.serverId);
-    if (!s) return null;
-    const d = s.data;
-    const upd = (patch: Partial<typeof d>) => {
-      const next = clone();
-      const t = next.servers.find((x) => x.id === selection.serverId)!;
-      Object.assign(t.data, patch);
-      onChange(next);
-    };
-    return (
-      <div className="space-y-3 p-4">
-        <h3 className="text-sm font-semibold text-slate-800">Server 属性</h3>
-        {field("listen", d.listen, (v) => upd({ listen: v }), "80 / 443 ssl")}
-        {field("server_name", d.serverName, (v) => upd({ serverName: v }), "example.com")}
-        {field("root", d.root, (v) => upd({ root: v }), "/var/www/html")}
-        {field("index", d.index, (v) => upd({ index: v }), "index.html")}
-        <label className="flex items-center gap-2 text-xs font-medium text-slate-600">
-          <input
-            type="checkbox"
-            checked={d.ssl}
-            onChange={(e) => upd({ ssl: e.target.checked })}
-          />
-          启用 SSL/HTTPS
-        </label>
-        {d.ssl && (
-          <>
-            {field("ssl_certificate", d.sslCertificate, (v) =>
-              upd({ sslCertificate: v })
-            )}
-            {field("ssl_certificate_key", d.sslCertificateKey, (v) =>
-              upd({ sslCertificateKey: v })
-            )}
-          </>
-        )}
-        <label className="block text-xs font-medium text-slate-600">
-          其它指令（原样保留）
-          <textarea
-            className="code mt-1 h-24 w-full rounded-md border border-slate-300 px-2 py-1.5"
-            value={d.extraDirectives}
-            onChange={(e) => upd({ extraDirectives: e.target.value })}
-          />
-        </label>
-      </div>
-    );
-  }
-
-  if (selection.kind === "location") {
-    const s = parsed.servers.find((x) => x.id === selection.serverId);
-    const loc = s?.locations.find((l) => l.id === selection.locationId);
-    if (!s || !loc) return null;
-    const d = loc.data;
-    const upd = (patch: Partial<typeof d>) => {
-      const next = clone();
-      const t = next.servers
-        .find((x) => x.id === selection.serverId)!
-        .locations.find((l) => l.id === selection.locationId)!;
-      Object.assign(t.data, patch);
-      onChange(next);
-    };
-    return (
-      <div className="space-y-3 p-4">
-        <h3 className="text-sm font-semibold text-slate-800">Location 属性</h3>
-        <label className="block text-xs font-medium text-slate-600">
-          匹配修饰符
-          <select
-            className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm"
-            value={d.modifier}
-            onChange={(e) => upd({ modifier: e.target.value })}
-          >
-            <option value="">（前缀，无修饰符）</option>
-            <option value="=">= 精确匹配</option>
-            <option value="^~">^~ 前缀优先</option>
-            <option value="~">~ 正则（区分大小写）</option>
-            <option value="~*">~* 正则（不区分大小写）</option>
-          </select>
-        </label>
-        {field("path", d.path, (v) => upd({ path: v }), "/api")}
-        {field("proxy_pass", d.proxyPass, (v) => upd({ proxyPass: v }), "http://127.0.0.1:8080")}
-        {field("try_files", d.tryFiles, (v) => upd({ tryFiles: v }), "$uri $uri/ /index.html")}
-        {field("root", d.root, (v) => upd({ root: v }))}
-        <label className="block text-xs font-medium text-slate-600">
-          其它指令（原样保留）
-          <textarea
-            className="code mt-1 h-24 w-full rounded-md border border-slate-300 px-2 py-1.5"
-            value={d.extraDirectives}
-            onChange={(e) => upd({ extraDirectives: e.target.value })}
-          />
-        </label>
-      </div>
-    );
-  }
-
-  // upstream
-  const u = parsed.upstreams.find((x) => x.id === selection.upstreamId);
-  if (!u) return null;
-  const d = u.data;
-  const upd = (patch: Partial<typeof d>) => {
-    const next = clone();
-    const t = next.upstreams.find((x) => x.id === selection.upstreamId)!;
-    Object.assign(t.data, patch);
-    onChange(next);
-  };
-  const updServer = (idx: number, patch: Partial<(typeof d.servers)[number]>) => {
-    const next = clone();
-    const t = next.upstreams.find((x) => x.id === selection.upstreamId)!;
-    Object.assign(t.data.servers[idx], patch);
-    onChange(next);
-  };
-  return (
-    <div className="space-y-3 p-4">
-      <h3 className="text-sm font-semibold text-slate-800">Upstream 属性</h3>
-      {field("name", d.name, (v) => upd({ name: v }), "backend")}
-      <label className="block text-xs font-medium text-slate-600">
-        负载均衡策略
-        <select
-          className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm"
-          value={d.method}
-          onChange={(e) => upd({ method: e.target.value })}
-        >
-          <option value="">轮询（默认）</option>
-          <option value="least_conn">least_conn 最少连接</option>
-          <option value="ip_hash">ip_hash</option>
-        </select>
-      </label>
-      <div className="text-xs font-medium text-slate-600">后端服务器</div>
-      {d.servers.map((srv, idx) => (
-        <div key={idx} className="rounded-md border border-slate-200 p-2">
-          <input
-            className="w-full rounded border border-slate-300 px-2 py-1 text-sm"
-            value={srv.address}
-            placeholder="127.0.0.1:8081"
-            onChange={(e) => updServer(idx, { address: e.target.value })}
-          />
-          <div className="mt-1 flex items-center gap-2 text-xs">
-            <input
-              className="w-20 rounded border border-slate-300 px-2 py-1"
-              value={srv.weight || ""}
-              placeholder="weight"
-              onChange={(e) => updServer(idx, { weight: e.target.value })}
-            />
-            <label className="flex items-center gap-1">
+    <div className="space-y-1.5">
+      {block.map((child, i) => {
+        const childPath = [...basePath, i];
+        if (isComment(child)) {
+          return (
+            <div key={i} className="flex items-center gap-1">
+              <span className="text-slate-400">#</span>
               <input
-                type="checkbox"
-                checked={!!srv.backup}
-                onChange={(e) => updServer(idx, { backup: e.target.checked })}
+                className="code flex-1 rounded border border-slate-200 bg-slate-50 px-1.5 py-1 text-xs text-slate-500"
+                value={child.comment ?? ""}
+                onChange={(e) =>
+                  onChange(updateComment(dirs, childPath, e.target.value))
+                }
               />
-              backup
-            </label>
-            <button
-              className="ml-auto text-red-500"
-              onClick={() => {
-                const next = clone();
-                next.upstreams
-                  .find((x) => x.id === selection.upstreamId)!
-                  .data.servers.splice(idx, 1);
-                onChange(next);
-              }}
+              <DeleteBtn onClick={() => onChange(removeNode(dirs, childPath))} />
+            </div>
+          );
+        }
+        if (isBlock(child)) {
+          return (
+            <div
+              key={i}
+              className="rounded-md border border-slate-200 p-2"
             >
-              删除
-            </button>
+              <div className="flex items-center gap-1">
+                <input
+                  className="w-20 rounded border border-slate-300 px-1.5 py-1 text-xs font-medium"
+                  value={child.directive}
+                  onChange={(e) =>
+                    onChange(updateDirectiveName(dirs, childPath, e.target.value))
+                  }
+                />
+                <input
+                  className="code flex-1 rounded border border-slate-300 px-1.5 py-1 text-xs"
+                  value={child.args.join(" ")}
+                  placeholder="参数"
+                  onChange={(e) =>
+                    onChange(
+                      updateArgs(
+                        dirs,
+                        childPath,
+                        e.target.value.split(/\s+/).filter(Boolean)
+                      )
+                    )
+                  }
+                />
+                <DeleteBtn onClick={() => onChange(removeNode(dirs, childPath))} />
+              </div>
+              <div className="mt-1.5 border-l-2 border-slate-100 pl-2">
+                <DirectiveList
+                  dirs={dirs}
+                  basePath={childPath}
+                  block={child.block || []}
+                  onChange={onChange}
+                />
+                <AddBtn
+                  onClick={() =>
+                    onChange(appendChild(dirs, childPath, newDirective()))
+                  }
+                />
+              </div>
+            </div>
+          );
+        }
+        // 普通指令
+        return (
+          <div key={i} className="flex items-center gap-1">
+            <input
+              className="w-24 rounded border border-slate-300 px-1.5 py-1 text-xs font-medium"
+              value={child.directive}
+              onChange={(e) =>
+                onChange(updateDirectiveName(dirs, childPath, e.target.value))
+              }
+            />
+            <input
+              className="code flex-1 rounded border border-slate-300 px-1.5 py-1 text-xs"
+              value={child.args.join(" ")}
+              placeholder="参数"
+              onChange={(e) =>
+                onChange(
+                  updateArgs(
+                    dirs,
+                    childPath,
+                    e.target.value.split(/\s+/).filter(Boolean)
+                  )
+                )
+              }
+            />
+            <DeleteBtn onClick={() => onChange(removeNode(dirs, childPath))} />
           </div>
-        </div>
-      ))}
-      <button
-        className="text-xs text-brand-600"
-        onClick={() => {
-          const next = clone();
-          next.upstreams
-            .find((x) => x.id === selection.upstreamId)!
-            .data.servers.push({ address: "" });
-          onChange(next);
-        }}
-      >
-        + 添加后端
-      </button>
+        );
+      })}
     </div>
   );
 }
 
-export type { Selection };
+function DeleteBtn({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className="shrink-0 rounded px-1 text-xs text-red-400 hover:bg-red-50 hover:text-red-600"
+      title="删除"
+    >
+      ✕
+    </button>
+  );
+}
+
+function AddBtn({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className="mt-1.5 text-xs text-brand-600 hover:text-brand-700"
+    >
+      + 添加指令
+    </button>
+  );
+}
+
+export default function PropertyPanel({ dirs, selectedPath, onChange }: Props) {
+  if (!selectedPath) {
+    return (
+      <div className="p-4 text-sm text-slate-400">
+        在画布上选中一个块（server / upstream 等）以编辑其指令。
+      </div>
+    );
+  }
+  const node = getNode(dirs, selectedPath);
+  if (!node) {
+    return <div className="p-4 text-sm text-slate-400">节点不存在。</div>;
+  }
+  const title =
+    node.args && node.args.length
+      ? `${node.directive} ${node.args.join(" ")}`
+      : node.directive;
+
+  return (
+    <div className="p-4">
+      <h3 className="mb-1 text-sm font-semibold text-slate-800">{title}</h3>
+      <p className="mb-3 text-xs text-slate-400">
+        块内指令（含注释，编辑后保存走 nginx -t 校验）
+      </p>
+      <DirectiveList
+        dirs={dirs}
+        basePath={selectedPath}
+        block={node.block || []}
+        onChange={onChange}
+      />
+      <AddBtn
+        onClick={() => onChange(appendChild(dirs, selectedPath, newDirective()))}
+      />
+    </div>
+  );
+}

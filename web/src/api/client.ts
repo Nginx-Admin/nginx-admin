@@ -29,6 +29,7 @@ export interface ServerStatus {
 export interface ConfigFileInfo {
   logical_path: string;
   size: number;
+  lines?: number;
   mtime_unix: number;
   checksum: string;
 }
@@ -37,6 +38,15 @@ export interface ReadConfigResp {
   path: string;
   content: string;
   checksum: string;
+}
+
+// crossplane 指令树节点（方案 B：画布直接消费此结构，保真注释与所有指令）。
+export interface Directive {
+  directive: string; // 指令名，注释为 "#"
+  line?: number;
+  args: string[]; // 参数
+  block?: Directive[]; // 块指令的子指令
+  comment?: string; // 当 directive === "#" 时的注释内容
 }
 
 export interface WriteConfigResp {
@@ -209,4 +219,10 @@ export const api = {
 
   // 审计
   listAudit: () => request<{ logs: AuditLog[] }>("GET", "/audit"),
+
+  // nginx 配置精确解析/回写（crossplane，供画布使用）
+  parseConfig: (content: string) =>
+    request<{ directives: Directive[] }>("POST", "/nginx/parse", { content }),
+  buildConfig: (directives: Directive[]) =>
+    request<{ content: string }>("POST", "/nginx/build", { directives }),
 };

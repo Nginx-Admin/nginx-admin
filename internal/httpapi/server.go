@@ -68,6 +68,10 @@ func (s *Server) Router() *gin.Engine {
 			authed.POST("/servers/:id/test", s.RequireRole("editor"), s.handleTest)
 			authed.POST("/servers/:id/reload", s.RequireRole("editor"), s.handleReload)
 
+			// nginx 配置精确解析/回写（crossplane，供画布使用）
+			authed.POST("/nginx/parse", s.handleParseConfig)
+			authed.POST("/nginx/build", s.handleBuildConfig)
+
 			// 备份/回滚
 			authed.GET("/servers/:id/backups", s.handleListBackups) // ?path=
 			authed.POST("/servers/:id/rollback", s.RequireRole("editor"), s.handleRollback)

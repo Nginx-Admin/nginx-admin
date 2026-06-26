@@ -1,20 +1,19 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { ReactFlowProvider } from "@xyflow/react";
 import { useParams, useSearchParams, useNavigate } from "react-router-dom";
-import { api } from "../api/client";
+import { api, type Directive } from "../api/client";
 import { Button } from "../components/ui";
 import { useAuth } from "../auth/AuthContext";
 import Canvas from "../canvas/Canvas";
-import PropertyPanel, { type Selection } from "../canvas/PropertyPanel";
-import { buildConfig, parseConfig, type ParsedConfig } from "../canvas/nginxParser";
+import PropertyPanel from "../canvas/PropertyPanel";
 import { matchLocation } from "../canvas/matcher";
+import type { NodePath } from "../canvas/directives";
 
 type Mode = "canvas" | "source";
 
-// 主配置判定（与 ServerDetail 一致）：根目录下的 nginx.conf。
+// 主配置判定（与 ServerDetail 一致）：文件名为 nginx.conf 即可，不限目录层级。
 function isMainConfig(logicalPath: string): boolean {
-  const p = logicalPath.replace(/^\.?\//, "");
-  return !p.includes("/") && /nginx\.conf$/i.test(p);
+  return /(^|\/)nginx\.conf$/i.test(logicalPath);
 }
 
 export default function ConfigEditor() {
@@ -26,12 +25,12 @@ export default function ConfigEditor() {
   const canEdit = user?.role === "admin" || user?.role === "editor";
   const isMain = isMainConfig(path);
 
-  // 主配置以 http/events 等块为主，不适合节点画布，默认进源码模式。
+  // 主配置以 http/events 等块为主，默认进源码模式。
   const [mode, setMode] = useState<Mode>(isMain ? "source" : "canvas");
   const [source, setSource] = useState("");
-  const [parsed, setParsed] = useState<ParsedConfig | null>(null);
+  const [dirs, setDirs] = useState<Directive[] | null>(null); // crossplane 指令树
   const [checksum, setChecksum] = useState("");
-  const [selection, setSelection] = useState<Selection>(null);
+  const [selectedPath, setSelectedPath] = useState<NodePath | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState("");
@@ -39,46 +38,75 @@ export default function ConfigEditor() {
 
   // 流量模拟
   const [simPath, setSimPath] = useState("");
-  const [matchedLoc, setMatchedLoc] = useState<string | null>(null);
+  const [matchedPath, setMatchedPath] = useState<NodePath | null>(null);
 
-  const load = useCallback(() => {
+  const load = useCallback(async () => {
     setLoading(true);
-    api
-      .readConfig(id, path)
-      .then((r) => {
-        setSource(r.content);
-        setChecksum(r.checksum);
-        setParsed(parseConfig(r.content));
-      })
-      .catch((e) => setErr((e as Error).message))
-      .finally(() => setLoading(false));
+    setErr("");
+    try {
+      const r = await api.readConfig(id, path);
+      setSource(r.content);
+      setChecksum(r.checksum);
+      // 画布模式下解析为指令树
+      if (mode === "canvas") {
+        try {
+          const p = await api.parseConfig(r.content);
+          setDirs(p.directives);
+        } catch (e) {
+          // 解析失败（语法错误等）→ 退回源码模式
+          setMode("source");
+          setErr("配置解析失败，已切换到源码模式：" + (e as Error).message);
+        }
+      }
+    } catch (e) {
+      setErr((e as Error).message);
+    } finally {
+      setLoading(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, path]);
 
-  useEffect(load, [load]);
+  useEffect(() => {
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, path]);
 
-  // 切到源码模式：从画布模型回写文本
-  const switchToSource = () => {
-    if (parsed) setSource(buildConfig(parsed));
+  // 切到源码模式：把当前指令树回写为文本
+  const switchToSource = async () => {
+    setErr("");
+    if (dirs) {
+      try {
+        const r = await api.buildConfig(dirs);
+        setSource(r.content);
+      } catch (e) {
+        setErr("生成配置文本失败：" + (e as Error).message);
+        return;
+      }
+    }
     setMode("source");
   };
-  // 切到画布模式：从文本重新解析
-  const switchToCanvas = () => {
-    setParsed(parseConfig(source));
-    setSelection(null);
-    setMode("canvas");
+
+  // 切到画布模式：把当前文本重新解析为指令树
+  const switchToCanvas = async () => {
+    setErr("");
+    try {
+      const p = await api.parseConfig(source);
+      setDirs(p.directives);
+      setSelectedPath(null);
+      setMatchedPath(null);
+      setMode("canvas");
+    } catch (e) {
+      setErr("配置解析失败（请检查语法，或留在源码模式）：" + (e as Error).message);
+    }
   };
 
-  const currentContent = useMemo(() => {
-    return mode === "source" ? source : parsed ? buildConfig(parsed) : "";
-  }, [mode, source, parsed]);
-
   const runSim = () => {
-    if (!parsed || !simPath) {
-      setMatchedLoc(null);
+    if (!dirs || !simPath) {
+      setMatchedPath(null);
       return;
     }
-    const m = matchLocation(parsed, simPath);
-    setMatchedLoc(m?.locationId || null);
+    const m = matchLocation(dirs, simPath);
+    setMatchedPath(m);
     if (!m) setMsg(`路径 ${simPath} 未匹配到任何 location`);
     else setMsg("");
   };
@@ -88,10 +116,18 @@ export default function ConfigEditor() {
     setMsg("");
     setErr("");
     try {
-      const r = await api.writeConfig(id, path, currentContent, checksum);
+      // 画布模式：先把指令树 build 成文本
+      let content = source;
+      if (mode === "canvas" && dirs) {
+        const b = await api.buildConfig(dirs);
+        content = b.content;
+      }
+      const r = await api.writeConfig(id, path, content, checksum);
       if (r.ok) {
         setMsg("保存成功：已通过 nginx -t 校验并 reload。");
         if (r.new_checksum) setChecksum(r.new_checksum);
+        // 同步源码视图
+        setSource(content);
       } else {
         setErr("保存失败（已自动回滚）：\n" + (r.error || ""));
       }
@@ -118,7 +154,7 @@ export default function ConfigEditor() {
         <span className="font-mono text-sm text-slate-700">{path}</span>
         {isMain && (
           <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">
-            主配置 · 高危
+            主配置
           </span>
         )}
         <div className="ml-4 inline-flex rounded-md border border-slate-300 text-sm">
@@ -163,14 +199,6 @@ export default function ConfigEditor() {
         </div>
       </div>
 
-      {isMain && (
-        <div className="mx-3 mt-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-          这是 nginx 主配置文件，改错会导致整个 nginx 无法启动。保存会经过 nginx -t
-          校验、失败自动回滚；但若该节点 Agent 未开启
-          <code className="mx-1">nginx.allow_main_config</code>，保存会被拒绝（默认只读）。
-        </div>
-      )}
-
       {(msg || err) && (
         <pre
           className={`code m-3 whitespace-pre-wrap rounded-md p-3 text-xs ${
@@ -186,23 +214,23 @@ export default function ConfigEditor() {
         {mode === "canvas" ? (
           <>
             <div className="flex-1">
-              {parsed && (
+              {dirs && (
                 <ReactFlowProvider>
                   <Canvas
-                    parsed={parsed}
-                    selection={selection}
-                    onSelect={setSelection}
-                    matchedLocationId={matchedLoc}
+                    dirs={dirs}
+                    selectedPath={selectedPath}
+                    onSelect={setSelectedPath}
+                    matchedPath={matchedPath}
                   />
                 </ReactFlowProvider>
               )}
             </div>
-            <div className="w-72 overflow-auto border-l border-slate-200 bg-white">
-              {parsed && (
+            <div className="w-80 overflow-auto border-l border-slate-200 bg-white">
+              {dirs && (
                 <PropertyPanel
-                  parsed={parsed}
-                  selection={selection}
-                  onChange={setParsed}
+                  dirs={dirs}
+                  selectedPath={selectedPath}
+                  onChange={setDirs}
                 />
               )}
             </div>

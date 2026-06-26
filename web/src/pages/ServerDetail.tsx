@@ -9,11 +9,11 @@ import {
 import { Button, statusBadge } from "../components/ui";
 import { useAuth } from "../auth/AuthContext";
 
-// 判定一个逻辑路径是否为主配置：位于 config_root 根下（不含子目录）、
-// 且文件名为 nginx.conf。子配置都带 conf.d/ 或 sites-enabled/ 等前缀。
+// 判定一个逻辑路径是否为主配置：文件名为 nginx.conf 即认为是主配置，
+// 不限是否位于子目录（兼容 openresty 等 config_root 较深的布局，
+// 如 /usr/local/openresty/nginx/conf/nginx.conf → logical_path 可能是 nginx.conf）。
 function isMainConfig(logicalPath: string): boolean {
-  const p = logicalPath.replace(/^\.?\//, "");
-  return !p.includes("/") && /nginx\.conf$/i.test(p);
+  return /(^|\/)nginx\.conf$/i.test(logicalPath);
 }
 
 export default function ServerDetail() {
@@ -28,7 +28,6 @@ export default function ServerDetail() {
   const [busy, setBusy] = useState(false);
 
   const canEdit = user?.role === "admin" || user?.role === "editor";
-  const isAdmin = user?.role === "admin";
 
   const mainFiles = files.filter((f) => isMainConfig(f.logical_path));
   const subFiles = files.filter((f) => !isMainConfig(f.logical_path));
@@ -102,12 +101,6 @@ export default function ServerDetail() {
     }
   };
 
-  const doDelete = async () => {
-    if (!confirm("确定删除该服务器？仅从中心移除，不影响 Agent 本机。")) return;
-    await api.deleteServer(id);
-    nav("/");
-  };
-
   return (
     <div className="p-6">
       <button
@@ -136,11 +129,6 @@ export default function ServerDetail() {
           {canEdit && (
             <Button onClick={doReload} disabled={busy}>
               Reload
-            </Button>
-          )}
-          {isAdmin && (
-            <Button variant="danger" onClick={doDelete}>
-              删除
             </Button>
           )}
         </div>
@@ -203,9 +191,6 @@ export default function ServerDetail() {
           <div className="mt-3">
             <div className="mb-1 flex items-center gap-2">
               <h3 className="text-sm font-semibold text-amber-700">主配置</h3>
-              <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] text-amber-700">
-                高危
-              </span>
             </div>
             {mainFiles.length === 0 ? (
               <div className="rounded-lg border border-slate-200 bg-white p-4 text-sm text-slate-400">
@@ -220,11 +205,6 @@ export default function ServerDetail() {
                   nav={nav}
                   main
                 />
-                <p className="border-t border-amber-200 px-4 py-2 text-xs text-amber-700">
-                  主配置改错会导致整个 nginx 无法启动。默认仅可查看；如需编辑，须在该节点
-                  Agent 的 config.yaml 中设置 <code>nginx.allow_main_config: true</code>。
-                  保存仍会经过 nginx -t 校验，失败自动回滚。
-                </p>
               </div>
             )}
           </div>
@@ -239,7 +219,7 @@ export default function ServerDetail() {
                 未发现子配置文件。
               </div>
             ) : (
-              <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+              <div className="max-h-[50vh] overflow-y-auto rounded-lg border border-slate-200 bg-white">
                 <ConfigTable
                   files={subFiles}
                   id={id}
@@ -275,7 +255,7 @@ function ConfigTable({
       >
         <tr>
           <th className="px-4 py-2 font-medium">逻辑路径</th>
-          <th className="px-4 py-2 font-medium">大小</th>
+          <th className="px-4 py-2 font-medium">行数</th>
           <th className="px-4 py-2 font-medium"></th>
         </tr>
       </thead>
@@ -285,7 +265,9 @@ function ConfigTable({
             <td className="px-4 py-2 font-mono text-slate-700">
               {f.logical_path}
             </td>
-            <td className="px-4 py-2 text-slate-500">{f.size} B</td>
+            <td className="px-4 py-2 text-slate-500">
+              {f.lines != null ? `${f.lines} 行` : "—"}
+            </td>
             <td className="px-4 py-2 text-right">
               <Button
                 variant="secondary"

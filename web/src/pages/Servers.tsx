@@ -42,9 +42,9 @@ export default function Servers() {
           还没有纳管任何服务器。{isAdmin && "点击右上角新增。"}
         </div>
       ) : (
-        <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+        <div className="max-h-[70vh] overflow-y-auto rounded-lg border border-slate-200 bg-white">
           <table className="w-full text-sm">
-            <thead className="bg-slate-50 text-left text-slate-500">
+            <thead className="sticky top-0 z-10 bg-slate-50 text-left text-slate-500">
               <tr>
                 <th className="px-4 py-2 font-medium">名称</th>
                 <th className="px-4 py-2 font-medium">地址</th>
@@ -145,6 +145,21 @@ function ServerModal({
     }
   };
 
+  const doDelete = async () => {
+    if (!server) return;
+    if (!confirm("确定删除该服务器？仅从中心移除，不影响 Agent 本机。")) return;
+    setBusy(true);
+    setErr("");
+    try {
+      await api.deleteServer(server.id);
+      onSaved();
+    } catch (e) {
+      setErr((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
     <div className="fixed inset-0 z-10 flex items-center justify-center bg-black/30 p-4">
       <form
@@ -174,17 +189,24 @@ function ServerModal({
           />
         </label>
         {err && <p className="mt-3 text-sm text-red-600">{err}</p>}
-        <div className="mt-5 flex justify-end gap-2">
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-md px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-100"
-          >
-            取消
-          </button>
-          <Button type="submit" disabled={busy}>
-            {busy ? "保存中..." : isEdit ? "保存" : "创建"}
-          </Button>
+        <div className="mt-5 flex items-center gap-2">
+          {isEdit && (
+            <Button type="button" variant="danger" onClick={doDelete} disabled={busy}>
+              删除服务器
+            </Button>
+          )}
+          <div className="ml-auto flex gap-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-md px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-100"
+            >
+              取消
+            </button>
+            <Button type="submit" disabled={busy}>
+              {busy ? "保存中..." : isEdit ? "保存" : "创建"}
+            </Button>
+          </div>
         </div>
       </form>
     </div>
