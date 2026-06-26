@@ -9,6 +9,13 @@ import {
 import { Button, statusBadge } from "../components/ui";
 import { useAuth } from "../auth/AuthContext";
 
+// 判定一个逻辑路径是否为主配置：位于 config_root 根下（不含子目录）、
+// 且文件名为 nginx.conf。子配置都带 conf.d/ 或 sites-enabled/ 等前缀。
+function isMainConfig(logicalPath: string): boolean {
+  const p = logicalPath.replace(/^\.?\//, "");
+  return !p.includes("/") && /nginx\.conf$/i.test(p);
+}
+
 export default function ServerDetail() {
   const { id = "" } = useParams();
   const nav = useNavigate();
@@ -22,6 +29,9 @@ export default function ServerDetail() {
 
   const canEdit = user?.role === "admin" || user?.role === "editor";
   const isAdmin = user?.role === "admin";
+
+  const mainFiles = files.filter((f) => isMainConfig(f.logical_path));
+  const subFiles = files.filter((f) => !isMainConfig(f.logical_path));
 
   const loadServer = useCallback(() => {
     api.getServer(id).then(setServer).catch((e) => setErr((e as Error).message));
@@ -102,7 +112,7 @@ export default function ServerDetail() {
     <div className="p-6">
       <button
         onClick={() => nav("/")}
-        className="mb-3 text-sm text-slate-500 hover:text-slate-700"
+        className="mb-3 inline-flex items-center rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-50"
       >
         ← 返回服务器列表
       </button>
@@ -183,48 +193,118 @@ export default function ServerDetail() {
         )}
       </div>
 
-      <div className="mt-3 overflow-hidden rounded-lg border border-slate-200 bg-white">
-        {files.length === 0 ? (
-          <div className="p-8 text-center text-slate-400">
-            暂无配置文件，点击「配置发现」扫描。
+      {files.length === 0 ? (
+        <div className="mt-3 rounded-lg border border-slate-200 bg-white p-8 text-center text-slate-400">
+          暂无配置文件，点击「配置发现」扫描。
+        </div>
+      ) : (
+        <>
+          {/* 主配置 */}
+          <div className="mt-3">
+            <div className="mb-1 flex items-center gap-2">
+              <h3 className="text-sm font-semibold text-amber-700">主配置</h3>
+              <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] text-amber-700">
+                高危
+              </span>
+            </div>
+            {mainFiles.length === 0 ? (
+              <div className="rounded-lg border border-slate-200 bg-white p-4 text-sm text-slate-400">
+                未发现主配置（nginx.conf）。
+              </div>
+            ) : (
+              <div className="overflow-hidden rounded-lg border border-amber-200 bg-amber-50/40">
+                <ConfigTable
+                  files={mainFiles}
+                  id={id}
+                  canEdit={canEdit}
+                  nav={nav}
+                  main
+                />
+                <p className="border-t border-amber-200 px-4 py-2 text-xs text-amber-700">
+                  主配置改错会导致整个 nginx 无法启动。默认仅可查看；如需编辑，须在该节点
+                  Agent 的 config.yaml 中设置 <code>nginx.allow_main_config: true</code>。
+                  保存仍会经过 nginx -t 校验，失败自动回滚。
+                </p>
+              </div>
+            )}
           </div>
-        ) : (
-          <table className="w-full text-sm">
-            <thead className="bg-slate-50 text-left text-slate-500">
-              <tr>
-                <th className="px-4 py-2 font-medium">逻辑路径</th>
-                <th className="px-4 py-2 font-medium">大小</th>
-                <th className="px-4 py-2 font-medium"></th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {files.map((f) => (
-                <tr key={f.logical_path} className="hover:bg-slate-50">
-                  <td className="px-4 py-2 font-mono text-slate-700">
-                    {f.logical_path}
-                  </td>
-                  <td className="px-4 py-2 text-slate-500">{f.size} B</td>
-                  <td className="px-4 py-2 text-right">
-                    <Button
-                      variant="secondary"
-                      onClick={() =>
-                        nav(
-                          `/servers/${id}/edit?path=${encodeURIComponent(
-                            f.logical_path
-                          )}`
-                        )
-                      }
-                    >
-                      {canEdit ? "编辑" : "查看"}
-                    </Button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
+
+          {/* 子配置 */}
+          <div className="mt-5">
+            <h3 className="mb-1 text-sm font-semibold text-slate-700">
+              子配置（conf.d / sites-enabled 等）
+            </h3>
+            {subFiles.length === 0 ? (
+              <div className="rounded-lg border border-slate-200 bg-white p-4 text-sm text-slate-400">
+                未发现子配置文件。
+              </div>
+            ) : (
+              <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+                <ConfigTable
+                  files={subFiles}
+                  id={id}
+                  canEdit={canEdit}
+                  nav={nav}
+                />
+              </div>
+            )}
+          </div>
+        </>
+      )}
     </div>
+  );
+}
+
+function ConfigTable({
+  files,
+  id,
+  canEdit,
+  nav,
+  main = false,
+}: {
+  files: ConfigFileInfo[];
+  id: string;
+  canEdit: boolean;
+  nav: ReturnType<typeof useNavigate>;
+  main?: boolean;
+}) {
+  return (
+    <table className="w-full text-sm">
+      <thead
+        className={`text-left ${main ? "bg-amber-100/60 text-amber-800" : "bg-slate-50 text-slate-500"}`}
+      >
+        <tr>
+          <th className="px-4 py-2 font-medium">逻辑路径</th>
+          <th className="px-4 py-2 font-medium">大小</th>
+          <th className="px-4 py-2 font-medium"></th>
+        </tr>
+      </thead>
+      <tbody className="divide-y divide-slate-100">
+        {files.map((f) => (
+          <tr key={f.logical_path} className="hover:bg-black/[0.02]">
+            <td className="px-4 py-2 font-mono text-slate-700">
+              {f.logical_path}
+            </td>
+            <td className="px-4 py-2 text-slate-500">{f.size} B</td>
+            <td className="px-4 py-2 text-right">
+              <Button
+                variant="secondary"
+                onClick={() =>
+                  nav(
+                    `/servers/${id}/edit?path=${encodeURIComponent(
+                      f.logical_path
+                    )}`
+                  )
+                }
+              >
+                {/* 主配置默认只读，进入后由后端控制能否保存 */}
+                {main || !canEdit ? "查看" : "编辑"}
+              </Button>
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
   );
 }
 

@@ -11,6 +11,12 @@ import { matchLocation } from "../canvas/matcher";
 
 type Mode = "canvas" | "source";
 
+// 主配置判定（与 ServerDetail 一致）：根目录下的 nginx.conf。
+function isMainConfig(logicalPath: string): boolean {
+  const p = logicalPath.replace(/^\.?\//, "");
+  return !p.includes("/") && /nginx\.conf$/i.test(p);
+}
+
 export default function ConfigEditor() {
   const { id = "" } = useParams();
   const [sp] = useSearchParams();
@@ -18,8 +24,10 @@ export default function ConfigEditor() {
   const nav = useNavigate();
   const { user } = useAuth();
   const canEdit = user?.role === "admin" || user?.role === "editor";
+  const isMain = isMainConfig(path);
 
-  const [mode, setMode] = useState<Mode>("canvas");
+  // 主配置以 http/events 等块为主，不适合节点画布，默认进源码模式。
+  const [mode, setMode] = useState<Mode>(isMain ? "source" : "canvas");
   const [source, setSource] = useState("");
   const [parsed, setParsed] = useState<ParsedConfig | null>(null);
   const [checksum, setChecksum] = useState("");
@@ -103,11 +111,16 @@ export default function ConfigEditor() {
       <div className="flex items-center gap-2 border-b border-slate-200 bg-white px-4 py-2">
         <button
           onClick={() => nav(`/servers/${id}`)}
-          className="text-sm text-slate-500 hover:text-slate-700"
+          className="inline-flex items-center rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-50"
         >
           ← 返回
         </button>
         <span className="font-mono text-sm text-slate-700">{path}</span>
+        {isMain && (
+          <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">
+            主配置 · 高危
+          </span>
+        )}
         <div className="ml-4 inline-flex rounded-md border border-slate-300 text-sm">
           <button
             className={`px-3 py-1 ${
@@ -149,6 +162,14 @@ export default function ConfigEditor() {
           )}
         </div>
       </div>
+
+      {isMain && (
+        <div className="mx-3 mt-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+          这是 nginx 主配置文件，改错会导致整个 nginx 无法启动。保存会经过 nginx -t
+          校验、失败自动回滚；但若该节点 Agent 未开启
+          <code className="mx-1">nginx.allow_main_config</code>，保存会被拒绝（默认只读）。
+        </div>
+      )}
 
       {(msg || err) && (
         <pre
