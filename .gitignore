@@ -1,0 +1,31 @@
+# 编译产物
+/nginx-admin
+/bin/
+*.exe
+
+# 前端依赖与本地产物
+web/node_modules/
+web/.vite/
+web/*.local
+
+# 注意：web/dist/ 需要提交（go:embed 依赖它）。
+# 若不想提交构建产物、改为发布时现构建，可取消下一行注释：
+# web/dist/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# 系统
+.DS_Store
+
+# 证书与私钥（切勿入库）
+*.pem
+*.key
+*.crt
+tls/
+
+# 本地配置覆盖（保留示例 config.yaml）
+config.local.yaml
+*.log

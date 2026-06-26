@@ -1,0 +1,33 @@
+[Unit]
+Description=nginx-admin 中心控制台
+Documentation=https://github.com/your-org/nginx-admin
+# PostgreSQL 同机部署：等数据库就绪后再启动
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/data/nginx-admin
+ExecStart=/data/nginx-admin/nginx-admin -config /data/nginx-admin/config.yaml
+
+# 崩溃自动重启
+Restart=on-failure
+RestartSec=3s
+
+# 优雅退出（main.go 监听 SIGTERM 做 http.Shutdown）
+KillSignal=SIGTERM
+TimeoutStopSec=15s
+
+# 日志走 journald，用 journalctl -u nginx-admin 查看
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=nginx-admin
+
+# 基本加固（admin 只需连库 + 提供 Web，不碰系统文件）
+NoNewPrivileges=true
+ProtectSystem=full
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
