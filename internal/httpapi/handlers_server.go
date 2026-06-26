@@ -3,6 +3,7 @@ package httpapi
 import (
 	"fmt"
 	"net/http"
+	"sync"
 
 	"github.com/gin-gonic/gin"
 
@@ -143,7 +144,59 @@ func (s *Server) handleListConfigs(c *gin.Context) {
 		c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"files": rep.GetFiles()})
+
+	// 为每个文件补充行数：并发读取内容计算（配置文件通常很小，Agent 在内网，
+	// 并发上限控制开销）。读失败的文件 lines 记 -1，前端回退显示大小。
+	type fileInfo struct {
+		LogicalPath string `json:"logical_path"`
+		Size        int64  `json:"size"`
+		MtimeUnix   int64  `json:"mtime_unix"`
+		Checksum    string `json:"checksum"`
+		Lines       int    `json:"lines"`
+	}
+	src := rep.GetFiles()
+	out := make([]fileInfo, len(src))
+	sem := make(chan struct{}, 8) // 并发上限 8
+	var wg sync.WaitGroup
+	for i, f := range src {
+		out[i] = fileInfo{
+			LogicalPath: f.GetLogicalPath(),
+			Size:        f.GetSize(),
+			MtimeUnix:   f.GetMtimeUnix(),
+			Checksum:    f.GetChecksum(),
+			Lines:       -1,
+		}
+		wg.Add(1)
+		go func(i int, path string) {
+			defer wg.Done()
+			sem <- struct{}{}
+			defer func() { <-sem }()
+			r, err := s.agents.ReadConfig(c.Request.Context(), srv.Address, path)
+			if err == nil {
+				out[i].Lines = countLines(r.GetContent())
+			}
+		}(i, f.GetLogicalPath())
+	}
+	wg.Wait()
+
+	c.JSON(http.StatusOK, gin.H{"files": out})
+}
+
+// countLines 统计字节内容的行数（最后一行无换行也计一行）。
+func countLines(b []byte) int {
+	if len(b) == 0 {
+		return 0
+	}
+	n := 0
+	for _, c := range b {
+		if c == '\n' {
+			n++
+		}
+	}
+	if b[len(b)-1] != '\n' {
+		n++
+	}
+	return n
 }
 
 func (s *Server) handleReadConfig(c *gin.Context) {

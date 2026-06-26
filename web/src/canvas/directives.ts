@@ -170,3 +170,113 @@ export function serverSummary(d: Directive): { listen: string; serverName: strin
   }
   return { listen, serverName };
 }
+
+// ---- 画布建模：递归收集 server / upstream（不限是否在 http 块内）+ 提取 location ----
+
+export interface FlowServer {
+  path: NodePath;
+  node: Directive;
+  listen: string;
+  serverName: string;
+  isHttpRedirect: boolean; // 含 return 30x https://
+  locations: FlowLocation[];
+}
+
+export interface FlowLocation {
+  path: NodePath; // 该 location 节点在树中的完整路径
+  node: Directive;
+  matcher: string; // location 的匹配串，如 "= /502.html"、"~ ^/template"、"/"
+  proxyPass: string;
+  upstreamName: string; // 若 proxy_pass 指向 upstream 名（非 IP），否则空
+  summary: string; // 一行摘要：proxy_pass / root / try_files
+}
+
+export interface FlowModel {
+  servers: FlowServer[];
+  upstreams: { path: NodePath; node: Directive; name: string }[];
+}
+
+// 递归遍历整棵树，收集所有 server 和 upstream 块（含 http 内部）。
+export function buildFlowModel(dirs: Directive[]): FlowModel {
+  const servers: FlowServer[] = [];
+  const upstreams: FlowModel["upstreams"] = [];
+
+  const walk = (arr: Directive[], base: NodePath) => {
+    arr.forEach((d, i) => {
+      const path = [...base, i];
+      if (d.directive === "server" && Array.isArray(d.block)) {
+        servers.push(extractServer(d, path));
+        return; // server 内部的 location 已在 extractServer 处理，不再下钻
+      }
+      if (d.directive === "upstream" && Array.isArray(d.block)) {
+        upstreams.push({ path, node: d, name: d.args[0] || "upstream" });
+        return;
+      }
+      if (Array.isArray(d.block)) walk(d.block, path);
+    });
+  };
+  walk(dirs, []);
+  return { servers, upstreams };
+}
+
+function extractServer(node: Directive, path: NodePath): FlowServer {
+  const { listen, serverName } = serverSummary(node);
+  let isHttpRedirect = false;
+  const locations: FlowLocation[] = [];
+
+  (node.block || []).forEach((c, i) => {
+    if (c.directive === "return") {
+      const joined = c.args.join(" ");
+      if (/^30[12]\s+https:\/\//i.test(joined) || /https:\/\//i.test(joined)) {
+        isHttpRedirect = true;
+      }
+    }
+    if (c.directive === "location" && Array.isArray(c.block)) {
+      locations.push(extractLocation(c, [...path, i]));
+    }
+  });
+
+  return { path, node, listen, serverName, isHttpRedirect, locations };
+}
+
+function extractLocation(node: Directive, path: NodePath): FlowLocation {
+  const matcher = node.args.join(" ") || "/";
+  let proxyPass = "";
+  let root = "";
+  let tryFiles = "";
+  for (const c of node.block || []) {
+    if (c.directive === "proxy_pass") proxyPass = c.args.join(" ");
+    if (c.directive === "root") root = c.args.join(" ");
+    if (c.directive === "try_files") tryFiles = c.args.join(" ");
+  }
+  // proxy_pass 指向 upstream 名（http://name，name 非 IP:port）
+  let upstreamName = "";
+  if (proxyPass) {
+    const m = proxyPass.match(/^https?:\/\/([^/;:]+)/);
+    if (m && !/^\d+\.\d+\.\d+\.\d+$/.test(m[1]) && m[1] !== "localhost") {
+      upstreamName = m[1];
+    }
+  }
+  let summary = "";
+  if (proxyPass) summary = "→ " + proxyPass;
+  else if (tryFiles) summary = "try_files " + tryFiles;
+  else if (root) summary = "root " + root;
+
+  return { path, node, matcher, proxyPass, upstreamName, summary };
+}
+
+// 判断两个 server 是否有相同的 server_name（用于 80→443 跳转连线）
+export function shareServerName(a: string, b: string): boolean {
+  const setA = new Set(a.split(/\s+/).filter(Boolean));
+  return b.split(/\s+/).some((n) => n && setA.has(n));
+}
+
+// 是否监听 443 / ssl
+export function isHttpsListen(listen: string): boolean {
+  return /\b443\b/.test(listen) || /\bssl\b/.test(listen);
+}
+
+// 是否监听 80（且非 ssl）
+export function isHttpListen(listen: string): boolean {
+  return /\b80\b/.test(listen) && !/\bssl\b/.test(listen);
+}

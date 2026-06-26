@@ -9,8 +9,10 @@ import {
 } from "@xyflow/react";
 import { nodeTypes } from "./nodes";
 import {
-  topBlocks,
-  serverSummary,
+  buildFlowModel,
+  shareServerName,
+  isHttpsListen,
+  isHttpListen,
   type Directive,
   type NodePath,
 } from "./directives";
@@ -25,103 +27,120 @@ interface Props {
 const samePath = (a: NodePath | null | undefined, b: NodePath | null | undefined) =>
   !!a && !!b && a.length === b.length && a.every((v, i) => v === b[i]);
 
-// 收集一个 server 块里 proxy_pass 引用的 upstream 名
-function referencedUpstreams(server: Directive): string[] {
-  const names: string[] = [];
-  const walk = (dirs: Directive[]) => {
-    for (const d of dirs) {
-      if (d.directive === "proxy_pass" && d.args[0]) {
-        // proxy_pass http://backend; → backend
-        const m = d.args[0].match(/^https?:\/\/([^/;]+)/);
-        if (m) names.push(m[1]);
-      }
-      if (d.block) walk(d.block);
-    }
-  };
-  walk(server.block || []);
-  return names;
-}
+const nid = (p: NodePath) => "n-" + p.join("-");
 
 function toFlow(
   dirs: Directive[],
   matchedPath?: NodePath | null
 ): { nodes: Node[]; edges: Edge[] } {
-  const blocks = topBlocks(dirs);
+  const model = buildFlowModel(dirs);
   const nodes: Node[] = [];
   const edges: Edge[] = [];
 
-  // 按类型分列：upstream 右列，server 左列，其它块中列
-  const upstreams = blocks.filter((b) => b.kind === "upstream");
-  const servers = blocks.filter((b) => b.kind === "server");
-  const others = blocks.filter((b) => b.kind !== "upstream" && b.kind !== "server");
-
-  // upstream 名 → nodeId
+  // upstream 名 → nodeId（右列）
   const upstreamId = new Map<string, string>();
-
-  upstreams.forEach((b, i) => {
-    const id = "n-" + b.path.join("-");
-    const name = b.node.args[0] || "upstream";
-    upstreamId.set(name, id);
+  model.upstreams.forEach((u, i) => {
+    const id = nid(u.path);
+    upstreamId.set(u.name, id);
     nodes.push({
       id,
       type: "blockNode",
-      position: { x: 680, y: 40 + i * 130 },
+      position: { x: 980, y: 40 + i * 130 },
       data: {
         kind: "upstream",
-        title: `upstream ${name}`,
-        childCount: (b.node.block || []).length,
-        matched: samePath(matchedPath, b.path),
-        path: b.path,
+        title: `upstream ${u.name}`,
+        subtitle: `${(u.node.block || []).length} 条指令`,
+        matched: samePath(matchedPath, u.path),
+        path: u.path,
       },
     });
   });
 
-  servers.forEach((b, i) => {
-    const id = "n-" + b.path.join("-");
-    const s = serverSummary(b.node);
+  // server（左列）+ 其下 location（中列）
+  let serverY = 40;
+  model.servers.forEach((s) => {
+    const sId = nid(s.path);
+    const locCount = s.locations.length;
+    // 该 server 纵向占用高度，保证 location 不重叠
+    const blockH = Math.max(1, locCount) * 96 + 40;
+
     nodes.push({
-      id,
+      id: sId,
       type: "blockNode",
-      position: { x: 80, y: 40 + i * 150 },
+      position: { x: 60, y: serverY + (blockH - 70) / 2 },
       data: {
         kind: "server",
         title: s.serverName ? `server ${s.serverName}` : "server",
         subtitle: s.listen ? `listen ${s.listen}` : undefined,
-        childCount: (b.node.block || []).length,
-        matched: samePath(matchedPath, b.path),
-        path: b.path,
+        badge: s.isHttpRedirect ? "→ HTTPS 跳转" : undefined,
+        matched: samePath(matchedPath, s.path),
+        path: s.path,
       },
     });
-    // server → upstream 连线
-    for (const up of referencedUpstreams(b.node)) {
-      const targetId = upstreamId.get(up);
-      if (targetId) {
-        edges.push({
-          id: `${id}-${targetId}`,
-          source: id,
-          target: targetId,
-          type: "smoothstep",
-          animated: true,
-        });
+
+    s.locations.forEach((loc, li) => {
+      const locId = nid(loc.path);
+      nodes.push({
+        id: locId,
+        type: "locationNode",
+        position: { x: 480, y: serverY + li * 96 },
+        data: {
+          kind: "location",
+          title: `location ${loc.matcher}`,
+          subtitle: loc.summary || undefined,
+          matched: samePath(matchedPath, loc.path),
+          path: loc.path,
+        },
+      });
+      // server → location
+      edges.push({
+        id: `${sId}-${locId}`,
+        source: sId,
+        target: locId,
+        type: "smoothstep",
+      });
+      // location → upstream（proxy_pass 指向 upstream 名）
+      if (loc.upstreamName) {
+        const target = upstreamId.get(loc.upstreamName);
+        if (target) {
+          edges.push({
+            id: `${locId}-${target}`,
+            source: locId,
+            target,
+            type: "smoothstep",
+            animated: true,
+          });
+        }
       }
-    }
+    });
+
+    serverY += blockH + 30;
   });
 
-  others.forEach((b, i) => {
-    const id = "n-" + b.path.join("-");
-    nodes.push({
-      id,
-      type: "blockNode",
-      position: { x: 380, y: 40 + i * 110 },
-      data: {
-        kind: b.kind,
-        title: b.title,
-        childCount: (b.node.block || []).length,
-        matched: samePath(matchedPath, b.path),
-        path: b.path,
-      },
-    });
-  });
+  // 80 → 443 跳转连线：HTTP 跳转 server → 同 server_name 的 HTTPS server
+  for (const src of model.servers) {
+    if (!src.isHttpRedirect || !isHttpListen(src.listen)) continue;
+    const target = model.servers.find(
+      (t) =>
+        t.path !== src.path &&
+        isHttpsListen(t.listen) &&
+        shareServerName(src.serverName, t.serverName)
+    );
+    if (target) {
+      edges.push({
+        id: `redirect-${nid(src.path)}-${nid(target.path)}`,
+        source: nid(src.path),
+        target: nid(target.path),
+        sourceHandle: "redirect-out",
+        targetHandle: "redirect-in",
+        type: "smoothstep",
+        animated: true,
+        label: "301 → HTTPS",
+        style: { stroke: "#f59e0b", strokeDasharray: "5 5" },
+        labelStyle: { fill: "#b45309", fontSize: 10 },
+      });
+    }
+  }
 
   return { nodes, edges };
 }
