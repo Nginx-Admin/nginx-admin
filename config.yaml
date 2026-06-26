@@ -1,0 +1,29 @@
+# nginx-admin（中心控制台）配置示例
+# 运行：./nginx-admin -config ./config.yaml
+
+http:
+  listen: "0.0.0.0:8080"
+  # 生产启用 HTTPS：
+  # tls_cert: /etc/nginx-admin/tls/server.crt
+  # tls_key:  /etc/nginx-admin/tls/server.key
+
+database:
+  # PostgreSQL 连接串
+  dsn: "host=10.80.128.6 port=5432 user=nginx_admin password=nginx_admin dbname=nginx_admin sslmode=disable TimeZone=Asia/Shanghai"
+
+auth:
+  jwt_secret: "please-change-this-to-a-long-random-secret"
+  token_ttl_hours: 24
+  max_login_fails: 5            # 连续失败次数阈值
+  lock_minutes: 30             # 锁定时长
+  default_admin_password: "admin"   # 仅首次启动创建 admin 时生效
+
+agent:
+  tls_enabled: false           # 连接 Agent 是否启用 mTLS（生产开启）
+  # cert: /etc/nginx-admin/tls/admin.crt
+  # key:  /etc/nginx-admin/tls/admin.key
+  # ca:   /etc/nginx-admin/tls/ca.crt
+  dial_timeout_seconds: 15
+
+backup:
+  retain_per_file: 5           # 中心侧每个配置文件保留最近 N 次副本

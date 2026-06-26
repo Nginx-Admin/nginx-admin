@@ -1,0 +1,162 @@
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { api, type Server } from "../api/client";
+import { Button, statusBadge } from "../components/ui";
+import { useAuth } from "../auth/AuthContext";
+
+export default function Servers() {
+  const { user } = useAuth();
+  const nav = useNavigate();
+  const [servers, setServers] = useState<Server[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState("");
+  const [showCreate, setShowCreate] = useState(false);
+
+  const load = () => {
+    setLoading(true);
+    api
+      .listServers()
+      .then((r) => setServers(r.servers || []))
+      .catch((e) => setErr((e as Error).message))
+      .finally(() => setLoading(false));
+  };
+  useEffect(load, []);
+
+  const isAdmin = user?.role === "admin";
+
+  return (
+    <div className="p-6">
+      <div className="flex items-center justify-between mb-4">
+        <h1 className="text-xl font-semibold text-slate-800">服务器</h1>
+        {isAdmin && (
+          <Button onClick={() => setShowCreate(true)}>+ 新增服务器</Button>
+        )}
+      </div>
+
+      {err && <p className="mb-3 text-sm text-red-600">{err}</p>}
+      {loading ? (
+        <p className="text-slate-400">加载中...</p>
+      ) : servers.length === 0 ? (
+        <div className="rounded-lg border border-dashed border-slate-300 p-10 text-center text-slate-400">
+          还没有纳管任何服务器。{isAdmin && "点击右上角新增。"}
+        </div>
+      ) : (
+        <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+          <table className="w-full text-sm">
+            <thead className="bg-slate-50 text-left text-slate-500">
+              <tr>
+                <th className="px-4 py-2 font-medium">名称</th>
+                <th className="px-4 py-2 font-medium">地址</th>
+                <th className="px-4 py-2 font-medium">状态</th>
+                <th className="px-4 py-2 font-medium">nginx 版本</th>
+                <th className="px-4 py-2 font-medium"></th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {servers.map((s) => (
+                <tr key={s.id} className="hover:bg-slate-50">
+                  <td className="px-4 py-2 font-medium text-slate-800">
+                    {s.name}
+                  </td>
+                  <td className="px-4 py-2 text-slate-600">{s.address}</td>
+                  <td className="px-4 py-2">{statusBadge(s.status)}</td>
+                  <td className="px-4 py-2 text-slate-600">
+                    {s.nginx_version || "-"}
+                  </td>
+                  <td className="px-4 py-2 text-right">
+                    <Button
+                      variant="secondary"
+                      onClick={() => nav(`/servers/${s.id}`)}
+                    >
+                      管理
+                    </Button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {showCreate && (
+        <CreateServerModal
+          onClose={() => setShowCreate(false)}
+          onCreated={() => {
+            setShowCreate(false);
+            load();
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function CreateServerModal({
+  onClose,
+  onCreated,
+}: {
+  onClose: () => void;
+  onCreated: () => void;
+}) {
+  const [name, setName] = useState("");
+  const [address, setAddress] = useState("");
+  const [err, setErr] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setBusy(true);
+    setErr("");
+    try {
+      await api.createServer(name, address);
+      onCreated();
+    } catch (e) {
+      setErr((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-10 flex items-center justify-center bg-black/30 p-4">
+      <form
+        onSubmit={submit}
+        className="w-full max-w-md rounded-xl bg-white p-6 shadow-lg"
+      >
+        <h2 className="text-lg font-semibold text-slate-800">新增服务器</h2>
+        <label className="mt-4 block text-sm font-medium text-slate-700">
+          名称
+          <input
+            className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="web-01"
+            autoFocus
+          />
+        </label>
+        <label className="mt-3 block text-sm font-medium text-slate-700">
+          Agent 地址 (host:port)
+          <input
+            className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+            value={address}
+            onChange={(e) => setAddress(e.target.value)}
+            placeholder="10.0.0.12:7443"
+          />
+        </label>
+        {err && <p className="mt-3 text-sm text-red-600">{err}</p>}
+        <div className="mt-5 flex justify-end gap-2">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-md px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-100"
+          >
+            取消
+          </button>
+          <Button type="submit" disabled={busy}>
+            {busy ? "创建中..." : "创建"}
+          </Button>
+        </div>
+      </form>
+    </div>
+  );
+}
