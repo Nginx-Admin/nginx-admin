@@ -178,16 +178,6 @@ export default function ServerDetail() {
           >
             {statusRefreshing ? "刷新中…" : "刷新状态"}
           </Button>
-          {canEdit && (
-            <Button variant="warning" onClick={doTest} disabled={busy}>
-              nginx -t
-            </Button>
-          )}
-          {canEdit && (
-            <Button onClick={doReload} disabled={busy}>
-              Reload
-            </Button>
-          )}
         </div>
       </div>
 
@@ -239,15 +229,25 @@ export default function ServerDetail() {
       <div className="mt-6 flex items-center justify-between">
         <h2 className="text-lg font-medium text-slate-800">配置文件</h2>
         {canEdit && (
-          <Button variant="secondary" onClick={doDiscover} disabled={busy}>
-            配置发现
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="warning" onClick={doTest} disabled={busy}>
+              nginx -t
+            </Button>
+            <Button onClick={doReload} disabled={busy}>
+              Reload
+            </Button>
+          </div>
         )}
       </div>
 
       {files.length === 0 ? (
-        <div className="mt-3 rounded-lg border border-slate-200 bg-white p-8 text-center text-slate-400">
-          暂无配置文件，点击「配置发现」扫描。
+        <div className="mt-3 flex flex-col items-center gap-3 rounded-lg border border-slate-200 bg-white p-8 text-center text-sm text-slate-400">
+          <span>暂无配置文件，点击下方按钮扫描。</span>
+          {canEdit && (
+            <Button variant="info" onClick={doDiscover} disabled={busy}>
+              配置发现
+            </Button>
+          )}
         </div>
       ) : (
         <>
@@ -276,16 +276,21 @@ export default function ServerDetail() {
           {/* 子配置 */}
           <div className="mt-5">
             <div className="mb-1 flex items-center justify-between">
-              <h3 className="text-sm font-semibold text-slate-700">
-                子配置（conf.d / sites-enabled 等）
-              </h3>
-              {canEdit && subDirs.length > 0 && (
-                <Button
-                  variant="success"
-                  onClick={() => setShowCreateConfig(true)}
-                >
-                  + 新建子配置
-                </Button>
+              <h3 className="text-sm font-semibold text-slate-700">子配置</h3>
+              {canEdit && (
+                <div className="flex gap-2">
+                  {subDirs.length > 0 && (
+                    <Button
+                      variant="success"
+                      onClick={() => setShowCreateConfig(true)}
+                    >
+                      新建配置
+                    </Button>
+                  )}
+                  <Button variant="info" onClick={doDiscover} disabled={busy}>
+                    配置发现
+                  </Button>
+                </div>
               )}
             </div>
             {subFiles.length === 0 ? (
