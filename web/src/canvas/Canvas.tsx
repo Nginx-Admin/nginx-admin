@@ -48,6 +48,41 @@ function toFlow(
   const nodes: Node[] = [];
   const edges: Edge[] = [];
 
+  // 结构块（http / events）与全局指令：主配置常见，放在画布顶部一行作为结构概览。
+  // 选中可在右侧属性面板编辑其块内指令。
+  let topX = 60;
+  model.structureBlocks.forEach((b) => {
+    nodes.push({
+      id: nid(b.path),
+      type: "blockNode",
+      position: { x: topX, y: -170 },
+      data: {
+        kind: b.kind === "events" ? "events" : "http",
+        title: b.title,
+        subtitle:
+          b.kind === "http"
+            ? `${b.directiveCount} 条指令 · 含 server/upstream`
+            : `${b.directiveCount} 条指令`,
+        path: b.path,
+      },
+    });
+    topX += 240;
+  });
+  // 全局指令汇总成一个节点（顶层 user/worker_processes/pid 等）
+  if (model.globals.length > 0) {
+    nodes.push({
+      id: "globals",
+      type: "blockNode",
+      position: { x: topX, y: -170 },
+      data: {
+        kind: "other",
+        title: "全局指令",
+        subtitle: `${model.globals.length} 条`,
+        path: model.globals[0].path, // 选中定位到第一条，便于在源码模式查看
+      },
+    });
+  }
+
   // upstream 名 → nodeId（右列）。本文件内定义的 upstream。
   const upstreamId = new Map<string, string>();
 

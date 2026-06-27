@@ -194,12 +194,55 @@ export interface FlowLocation {
 export interface FlowModel {
   servers: FlowServer[];
   upstreams: { path: NodePath; node: Directive; name: string }[];
+  // 结构块：http / events 等外层块（主配置常见），画布作为容器/汇总节点展示
+  structureBlocks: {
+    path: NodePath;
+    node: Directive;
+    kind: "http" | "events" | "other";
+    title: string;
+    childCount: number;
+    directiveCount: number; // 块内非块指令数（gzip/proxy_*/log_format 等）
+  }[];
+  // 顶层全局指令（http/events 之外的简单指令，如 user/worker_processes/pid）
+  globals: { path: NodePath; node: Directive; text: string }[];
 }
 
-// 递归遍历整棵树，收集所有 server 和 upstream 块（含 http 内部）。
+// 递归遍历整棵树，收集所有 server 和 upstream 块（含 http 内部），
+// 同时收集顶层的 http/events 结构块与全局指令（用于主配置画布展示）。
 export function buildFlowModel(dirs: Directive[]): FlowModel {
   const servers: FlowServer[] = [];
   const upstreams: FlowModel["upstreams"] = [];
+  const structureBlocks: FlowModel["structureBlocks"] = [];
+  const globals: FlowModel["globals"] = [];
+
+  // 顶层（根）扫描：识别 http/events 结构块与全局指令
+  dirs.forEach((d, i) => {
+    if (isComment(d)) return;
+    if (isBlock(d)) {
+      if (d.directive === "http" || d.directive === "events") {
+        const block = d.block || [];
+        const directiveCount = block.filter(
+          (c) => !isBlock(c) && !isComment(c)
+        ).length;
+        structureBlocks.push({
+          path: [i],
+          node: d,
+          kind: d.directive,
+          title: d.directive,
+          childCount: block.length,
+          directiveCount,
+        });
+      }
+      // server/upstream 顶层块由下面的 walk 统一收集
+    } else {
+      // 顶层简单指令 = 全局指令
+      const text =
+        d.args && d.args.length
+          ? `${d.directive} ${d.args.join(" ")}`
+          : d.directive;
+      globals.push({ path: [i], node: d, text });
+    }
+  });
 
   const walk = (arr: Directive[], base: NodePath) => {
     arr.forEach((d, i) => {
@@ -216,7 +259,7 @@ export function buildFlowModel(dirs: Directive[]): FlowModel {
     });
   };
   walk(dirs, []);
-  return { servers, upstreams };
+  return { servers, upstreams, structureBlocks, globals };
 }
 
 function extractServer(node: Directive, path: NodePath): FlowServer {

@@ -24,8 +24,9 @@ export default function ConfigEditor() {
   const canEdit = user?.role === "admin" || user?.role === "editor";
   const isMain = isMainConfig(path);
 
-  // 主配置以 http/events 等块为主，默认进源码模式。
-  const [mode, setMode] = useState<Mode>(isMain ? "source" : "canvas");
+  // 主配置含 http/events 结构块，画布会以结构概览 + 内部 server 展示；
+  // 解析失败时自动回退源码模式（见 load）。
+  const [mode, setMode] = useState<Mode>("canvas");
   const [source, setSource] = useState("");
   const [dirs, setDirs] = useState<Directive[] | null>(null); // crossplane 指令树
   const [checksum, setChecksum] = useState("");
