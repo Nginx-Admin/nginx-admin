@@ -3,7 +3,7 @@ import { useAuth } from "../auth/AuthContext";
 import { Button } from "./ui";
 
 const nav = [
-  { to: "/", label: "服务器", end: true },
+  { to: "/", label: "服务列表", end: true },
   { to: "/audit", label: "操作审计", end: false },
   { to: "/settings", label: "显示设置", end: false },
 ];

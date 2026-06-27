@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   api,
@@ -26,11 +26,27 @@ export default function ServerDetail() {
   const [msg, setMsg] = useState("");
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
+  const [showCreateConfig, setShowCreateConfig] = useState(false);
+
+  // 子配置列表容器（用于保持/恢复滚动位置）
+  const subListRef = useRef<HTMLDivElement>(null);
 
   const canEdit = user?.role === "admin" || user?.role === "editor";
 
   const mainFiles = files.filter((f) => isMainConfig(f.logical_path));
   const subFiles = files.filter((f) => !isMainConfig(f.logical_path));
+
+  // 从已发现的子配置提取去重目录集合（这些目录都是经 include 加载进来的），
+  // 供"新建子配置"选择落盘目录。
+  const subDirs = useMemo(() => {
+    const set = new Set<string>();
+    for (const f of subFiles) {
+      const idx = f.logical_path.lastIndexOf("/");
+      set.add(idx >= 0 ? f.logical_path.slice(0, idx) : ".");
+    }
+    return Array.from(set).sort();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [files]);
 
   const loadServer = useCallback(() => {
     api.getServer(id).then(setServer).catch((e) => setErr((e as Error).message));
@@ -56,6 +72,23 @@ export default function ServerDetail() {
     loadStatus();
     loadConfigs();
   }, [loadServer, loadStatus, loadConfigs]);
+
+  // 需求：保持子配置列表滚动位置（打开文件再返回时不回到顶部）。
+  const scrollKey = `subListScroll:${id}`;
+  // 列表渲染出来后恢复上次滚动位置
+  useEffect(() => {
+    if (subFiles.length === 0) return;
+    const el = subListRef.current;
+    if (!el) return;
+    const saved = sessionStorage.getItem(scrollKey);
+    if (saved) el.scrollTop = parseInt(saved, 10) || 0;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [files]);
+  // 实时记录滚动位置
+  const onSubListScroll = () => {
+    const el = subListRef.current;
+    if (el) sessionStorage.setItem(scrollKey, String(el.scrollTop));
+  };
 
   const doDiscover = async () => {
     setBusy(true);
@@ -107,7 +140,7 @@ export default function ServerDetail() {
         onClick={() => nav("/")}
         className="mb-3 inline-flex items-center rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-50"
       >
-        ← 返回服务器列表
+        ← 返回服务列表
       </button>
 
       <div className="flex items-center justify-between">
@@ -118,11 +151,11 @@ export default function ServerDetail() {
           <p className="text-sm text-slate-500">{server?.address}</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="secondary" onClick={loadStatus} disabled={busy}>
+          <Button variant="info" onClick={loadStatus} disabled={busy}>
             刷新状态
           </Button>
           {canEdit && (
-            <Button variant="secondary" onClick={doTest} disabled={busy}>
+            <Button variant="warning" onClick={doTest} disabled={busy}>
               nginx -t
             </Button>
           )}
@@ -211,15 +244,29 @@ export default function ServerDetail() {
 
           {/* 子配置 */}
           <div className="mt-5">
-            <h3 className="mb-1 text-sm font-semibold text-slate-700">
-              子配置（conf.d / sites-enabled 等）
-            </h3>
+            <div className="mb-1 flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-slate-700">
+                子配置（conf.d / sites-enabled 等）
+              </h3>
+              {canEdit && subDirs.length > 0 && (
+                <Button
+                  variant="success"
+                  onClick={() => setShowCreateConfig(true)}
+                >
+                  + 新建子配置
+                </Button>
+              )}
+            </div>
             {subFiles.length === 0 ? (
               <div className="rounded-lg border border-slate-200 bg-white p-4 text-sm text-slate-400">
                 未发现子配置文件。
               </div>
             ) : (
-              <div className="max-h-[50vh] overflow-y-auto rounded-lg border border-slate-200 bg-white">
+              <div
+                ref={subListRef}
+                onScroll={onSubListScroll}
+                className="max-h-[50vh] overflow-y-auto rounded-lg border border-slate-200 bg-white"
+              >
                 <ConfigTable
                   files={subFiles}
                   id={id}
@@ -230,6 +277,19 @@ export default function ServerDetail() {
             )}
           </div>
         </>
+      )}
+
+      {showCreateConfig && (
+        <CreateConfigModal
+          dirs={subDirs}
+          onClose={() => setShowCreateConfig(false)}
+          onCreated={(logicalPath) => {
+            setShowCreateConfig(false);
+            // 直接进入编辑器编辑新建的文件
+            nav(`/servers/${id}/edit?path=${encodeURIComponent(logicalPath)}`);
+          }}
+          serverId={id}
+        />
       )}
     </div>
   );
@@ -295,6 +355,123 @@ function StatCard({ label, value }: { label: string; value: React.ReactNode }) {
     <div className="rounded-lg border border-slate-200 bg-white p-3">
       <div className="text-xs text-slate-400">{label}</div>
       <div className="mt-1 text-sm font-medium text-slate-800">{value}</div>
+    </div>
+  );
+}
+
+// 新建子配置弹窗：目录从已发现的子配置目录下拉选择（均为 include 加载的目录），
+// 文件名与内容由用户自定义。保存走写入接口（含 nginx -t 校验 + reload + 失败回滚）。
+function CreateConfigModal({
+  serverId,
+  dirs,
+  onClose,
+  onCreated,
+}: {
+  serverId: string;
+  dirs: string[];
+  onClose: () => void;
+  onCreated: (logicalPath: string) => void;
+}) {
+  const [dir, setDir] = useState(dirs[0] || "");
+  const [filename, setFilename] = useState("");
+  const [content, setContent] = useState(
+    "server {\n    listen 80;\n    server_name example.com;\n\n    location / {\n        proxy_pass http://127.0.0.1:8080;\n    }\n}\n"
+  );
+  const [err, setErr] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const name = filename.trim();
+    if (!name) {
+      setErr("请填写文件名");
+      return;
+    }
+    if (!/^[\w.\-]+$/.test(name)) {
+      setErr("文件名只能包含字母、数字、点、下划线、连字符");
+      return;
+    }
+    const fname = /\.conf$/i.test(name) ? name : name + ".conf";
+    const logicalPath = dir === "." || dir === "" ? fname : `${dir}/${fname}`;
+
+    setBusy(true);
+    setErr("");
+    try {
+      // 新建：expected_checksum 留空。后端写入后会做 nginx -t + reload，失败回滚。
+      const r = await api.writeConfig(serverId, logicalPath, content, "");
+      if (r.ok) {
+        onCreated(logicalPath);
+      } else {
+        setErr("创建失败（已回滚）：\n" + (r.error || ""));
+      }
+    } catch (e) {
+      setErr((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-10 flex items-center justify-center bg-black/30 p-4">
+      <form
+        onSubmit={submit}
+        className="flex max-h-[85vh] w-full max-w-2xl flex-col rounded-xl bg-white p-6 shadow-lg"
+      >
+        <h2 className="text-lg font-semibold text-slate-800">新建子配置</h2>
+        <div className="mt-4 flex gap-3">
+          <label className="block text-sm font-medium text-slate-700">
+            目录
+            <select
+              className="mt-1 w-48 rounded-md border border-slate-300 px-3 py-2 text-sm"
+              value={dir}
+              onChange={(e) => setDir(e.target.value)}
+            >
+              {dirs.map((d) => (
+                <option key={d} value={d}>
+                  {d === "." ? "（根目录）" : d}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="block flex-1 text-sm font-medium text-slate-700">
+            文件名
+            <input
+              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+              value={filename}
+              onChange={(e) => setFilename(e.target.value)}
+              placeholder="example.com（自动补 .conf）"
+              autoFocus
+            />
+          </label>
+        </div>
+        <label className="mt-3 block flex-1 text-sm font-medium text-slate-700">
+          配置内容
+          <textarea
+            className="code mt-1 h-64 w-full resize-none rounded-md border border-slate-300 p-3"
+            value={content}
+            onChange={(e) => setContent(e.target.value)}
+            spellCheck={false}
+          />
+        </label>
+
+        {err && (
+          <pre className="code mt-3 whitespace-pre-wrap rounded-md bg-red-50 p-2 text-xs text-red-700">
+            {err}
+          </pre>
+        )}
+        <div className="mt-4 flex justify-end gap-2">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-md px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-100"
+          >
+            取消
+          </button>
+          <Button type="submit" disabled={busy}>
+            {busy ? "创建中..." : "创建并校验"}
+          </Button>
+        </div>
+      </form>
     </div>
   );
 }
