@@ -14,6 +14,10 @@ export type { Directive };
 // 节点路径：从根到目标的索引序列，如 [0,2,1] 表示 root[0].block[2].block[1]。
 export type NodePath = number[];
 
+// 特殊选中标记：表示"所有顶层全局指令"（而非某个具体节点）。
+// 用一个不可能出现在真实路径中的负数索引。
+export const GLOBALS_MARKER = -999;
+
 // 深拷贝整棵树（编辑前用，保持不可变更新）
 export function cloneTree(dirs: Directive[]): Directive[] {
   return JSON.parse(JSON.stringify(dirs));

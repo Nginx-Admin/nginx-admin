@@ -12,6 +12,7 @@ import {
   buildFlowModel,
   shareServerName,
   isHttpsListen,
+  GLOBALS_MARKER,
   type Directive,
   type NodePath,
 } from "./directives";
@@ -78,7 +79,8 @@ function toFlow(
         kind: "other",
         title: "全局指令",
         subtitle: `${model.globals.length} 条`,
-        path: model.globals[0].path, // 选中定位到第一条，便于在源码模式查看
+        // 特殊标记：选中后属性面板渲染“所有顶层简单指令”，而非某单个节点
+        path: [GLOBALS_MARKER],
       },
     });
   }

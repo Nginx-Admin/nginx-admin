@@ -8,6 +8,7 @@ import {
   updateArgs,
   updateComment,
   updateDirectiveName,
+  GLOBALS_MARKER,
   type Directive,
   type NodePath,
 } from "./directives";
@@ -158,6 +159,63 @@ export default function PropertyPanel({ dirs, selectedPath, onChange }: Props) {
       </div>
     );
   }
+
+  // 全局指令：渲染所有顶层简单指令（user / worker_processes / pid 等），可编辑增删。
+  if (selectedPath.length === 1 && selectedPath[0] === GLOBALS_MARKER) {
+    return (
+      <div className="p-4">
+        <h3 className="mb-1 text-sm font-semibold text-slate-800">全局指令</h3>
+        <p className="mb-3 text-xs text-slate-400">
+          顶层全局指令（http / events 之外，编辑后保存走 nginx -t 校验）
+        </p>
+        <div className="space-y-1.5">
+          {dirs.map((d, i) => {
+            if (isBlock(d) || isComment(d)) return null; // 只列简单指令
+            const path = [i];
+            return (
+              <div key={i} className="flex items-center gap-1">
+                <input
+                  className="w-32 rounded border border-slate-300 px-1.5 py-1 text-xs font-medium"
+                  value={d.directive}
+                  onChange={(e) =>
+                    onChange(updateDirectiveName(dirs, path, e.target.value))
+                  }
+                />
+                <input
+                  className="code flex-1 rounded border border-slate-300 px-1.5 py-1 text-xs"
+                  value={d.args.join(" ")}
+                  placeholder="参数"
+                  onChange={(e) =>
+                    onChange(
+                      updateArgs(
+                        dirs,
+                        path,
+                        e.target.value.split(/\s+/).filter(Boolean)
+                      )
+                    )
+                  }
+                />
+                <button
+                  onClick={() => onChange(removeNode(dirs, path))}
+                  className="shrink-0 rounded px-1 text-xs text-red-400 hover:bg-red-50 hover:text-red-600"
+                  title="删除"
+                >
+                  ✕
+                </button>
+              </div>
+            );
+          })}
+        </div>
+        <button
+          onClick={() => onChange([...dirs, newDirective()])}
+          className="mt-3 text-xs text-brand-600 hover:text-brand-700"
+        >
+          + 添加全局指令
+        </button>
+      </div>
+    );
+  }
+
   const node = getNode(dirs, selectedPath);
   if (!node) {
     return <div className="p-4 text-sm text-slate-400">节点不存在。</div>;
