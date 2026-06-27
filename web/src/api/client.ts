@@ -234,25 +234,4 @@ export const api = {
     request<{ directives: Directive[] }>("POST", "/nginx/parse", { content }),
   buildConfig: (directives: Directive[]) =>
     request<{ content: string }>("POST", "/nginx/build", { directives }),
-
-  // Agent 本地设置（按服务器：快照保留、主配置编辑开关）
-  getAgentSettings: (id: string) =>
-    request<{
-      backup_retain: number;
-      allow_main_config: boolean;
-      allow_main_config_remote: boolean;
-    }>("GET", `/servers/${id}/agent-settings`),
-  updateAgentSettings: (
-    id: string,
-    backup_retain: number,
-    allow_main_config: boolean
-  ) =>
-    request<{
-      backup_retain: number;
-      allow_main_config: boolean;
-      allow_main_config_remote: boolean;
-    }>("PUT", `/servers/${id}/agent-settings`, {
-      backup_retain,
-      allow_main_config,
-    }),
 };

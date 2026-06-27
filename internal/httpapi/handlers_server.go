@@ -551,58 +551,6 @@ func (s *Server) handleListAudit(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"logs": rows})
 }
 
-// handleGetAgentSettings 读取某服务器 Agent 的本地设置（快照保留、主配置编辑开关）。
-func (s *Server) handleGetAgentSettings(c *gin.Context) {
-	srv := s.mustServer(c)
-	if srv == nil {
-		return
-	}
-	rep, err := s.agents.GetAgentSettings(c.Request.Context(), srv.Address)
-	if err != nil {
-		c.JSON(http.StatusBadGateway, gin.H{"error": "无法连接 Agent: " + err.Error()})
-		return
-	}
-	c.JSON(http.StatusOK, gin.H{
-		"backup_retain":            rep.GetBackupRetain(),
-		"allow_main_config":        rep.GetAllowMainConfig(),
-		"allow_main_config_remote": rep.GetAllowMainConfigRemote(),
-	})
-}
-
-type updateAgentSettingsReq struct {
-	BackupRetain    int32 `json:"backup_retain"`
-	AllowMainConfig bool  `json:"allow_main_config"`
-}
-
-// handleUpdateAgentSettings 下发设置到某服务器的 Agent。
-func (s *Server) handleUpdateAgentSettings(c *gin.Context) {
-	srv := s.mustServer(c)
-	if srv == nil {
-		return
-	}
-	var req updateAgentSettingsReq
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "参数错误"})
-		return
-	}
-	rep, err := s.agents.UpdateAgentSettings(c.Request.Context(), srv.Address, &pb.UpdateAgentSettingsRequest{
-		BackupRetain:    req.BackupRetain,
-		AllowMainConfig: req.AllowMainConfig,
-		Actor:           currentClaims(c).UserID,
-	})
-	if err != nil {
-		c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
-		return
-	}
-	s.audit(currentClaims(c).UserID, srv.ID, "agent.settings.update", srv.Name, "success",
-		fmt.Sprintf("retain=%d allow_main_config=%v", rep.GetBackupRetain(), rep.GetAllowMainConfig()))
-	c.JSON(http.StatusOK, gin.H{
-		"backup_retain":            rep.GetBackupRetain(),
-		"allow_main_config":        rep.GetAllowMainConfig(),
-		"allow_main_config_remote": rep.GetAllowMainConfigRemote(),
-	})
-}
-
 // mustServer 取路径参数 :id 对应的服务器，不存在则写 404 并返回 nil。
 func (s *Server) mustServer(c *gin.Context) *model.Server {
 	id := c.Param("id")
