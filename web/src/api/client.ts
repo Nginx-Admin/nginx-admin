@@ -176,6 +176,9 @@ export const api = {
     request<{ ok: boolean }>("DELETE", `/servers/${id}`),
   serverStatus: (id: string) =>
     request<ServerStatus>("GET", `/servers/${id}/status`),
+  // 缓存状态（不打 Agent，秒返回，供详情页先显示）
+  serverStatusCached: (id: string) =>
+    request<ServerStatus>("GET", `/servers/${id}/status/cached`),
   discover: (id: string) =>
     request<{ files: ConfigFileInfo[]; server_names: string[] }>(
       "POST",
@@ -231,4 +234,32 @@ export const api = {
     request<{ directives: Directive[] }>("POST", "/nginx/parse", { content }),
   buildConfig: (directives: Directive[]) =>
     request<{ content: string }>("POST", "/nginx/build", { directives }),
+
+  // 中心全局设置（备份保留份数）
+  getSettings: () => request<{ retain_per_file: number }>("GET", "/settings"),
+  updateSettings: (retain_per_file: number) =>
+    request<{ retain_per_file: number }>("PUT", "/settings", {
+      retain_per_file,
+    }),
+
+  // Agent 本地设置（按服务器：快照保留、主配置编辑开关）
+  getAgentSettings: (id: string) =>
+    request<{
+      backup_retain: number;
+      allow_main_config: boolean;
+      allow_main_config_remote: boolean;
+    }>("GET", `/servers/${id}/agent-settings`),
+  updateAgentSettings: (
+    id: string,
+    backup_retain: number,
+    allow_main_config: boolean
+  ) =>
+    request<{
+      backup_retain: number;
+      allow_main_config: boolean;
+      allow_main_config_remote: boolean;
+    }>("PUT", `/servers/${id}/agent-settings`, {
+      backup_retain,
+      allow_main_config,
+    }),
 };

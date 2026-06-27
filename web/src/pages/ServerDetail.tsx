@@ -27,6 +27,7 @@ export default function ServerDetail() {
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
   const [showCreateConfig, setShowCreateConfig] = useState(false);
+  const [statusRefreshing, setStatusRefreshing] = useState(false);
 
   // 子配置列表容器（用于保持/恢复滚动位置）
   const subListRef = useRef<HTMLDivElement>(null);
@@ -52,12 +53,31 @@ export default function ServerDetail() {
     api.getServer(id).then(setServer).catch((e) => setErr((e as Error).message));
   }, [id]);
 
+  // 实时拉取状态（打 Agent，1-2s）。手动"刷新状态"按钮调用。
   const loadStatus = useCallback(() => {
     setErr("");
+    setStatusRefreshing(true);
     api
       .serverStatus(id)
       .then(setStatus)
-      .catch((e) => setErr((e as Error).message));
+      .catch((e) => setErr((e as Error).message))
+      .finally(() => setStatusRefreshing(false));
+  }, [id]);
+
+  // 进页面：先秒显缓存状态，再后台静默刷新实时状态（stale-while-revalidate）。
+  const loadStatusFast = useCallback(() => {
+    // 1) 缓存秒显
+    api
+      .serverStatusCached(id)
+      .then((s) => setStatus((prev) => prev ?? s))
+      .catch(() => {});
+    // 2) 后台实时刷新
+    setStatusRefreshing(true);
+    api
+      .serverStatus(id)
+      .then(setStatus)
+      .catch(() => {}) // 后台刷新失败不打扰，保留缓存值
+      .finally(() => setStatusRefreshing(false));
   }, [id]);
 
   const loadConfigs = useCallback(() => {
@@ -69,9 +89,9 @@ export default function ServerDetail() {
 
   useEffect(() => {
     loadServer();
-    loadStatus();
+    loadStatusFast();
     loadConfigs();
-  }, [loadServer, loadStatus, loadConfigs]);
+  }, [loadServer, loadStatusFast, loadConfigs]);
 
   // 需求：保持子配置列表滚动位置（打开文件再返回时不回到顶部）。
   const scrollKey = `subListScroll:${id}`;
@@ -151,8 +171,12 @@ export default function ServerDetail() {
           <p className="text-sm text-slate-500">{server?.address}</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="info" onClick={loadStatus} disabled={busy}>
-            刷新状态
+          <Button
+            variant="info"
+            onClick={loadStatus}
+            disabled={busy || statusRefreshing}
+          >
+            {statusRefreshing ? "刷新中…" : "刷新状态"}
           </Button>
           {canEdit && (
             <Button variant="warning" onClick={doTest} disabled={busy}>
@@ -173,18 +197,25 @@ export default function ServerDetail() {
         <StatCard
           label="nginx 进程"
           value={
-            status?.nginx_running ? (
+            !status ? (
+              <Skeleton />
+            ) : status.nginx_running ? (
               <span className="text-green-600">运行中</span>
             ) : (
               <span className="text-red-600">未运行</span>
             )
           }
         />
-        <StatCard label="版本" value={status?.nginx_version || "-"} />
+        <StatCard
+          label="版本"
+          value={!status ? <Skeleton /> : status.nginx_version || "-"}
+        />
         <StatCard
           label="配置检查"
           value={
-            status?.last_test_ok ? (
+            !status ? (
+              <Skeleton />
+            ) : status.last_test_ok ? (
               <span className="text-green-600">通过</span>
             ) : (
               <span className="text-amber-600">异常</span>
@@ -356,6 +387,13 @@ function StatCard({ label, value }: { label: string; value: React.ReactNode }) {
       <div className="text-xs text-slate-400">{label}</div>
       <div className="mt-1 text-sm font-medium text-slate-800">{value}</div>
     </div>
+  );
+}
+
+// 加载占位骨架（状态数据未到时显示）。
+function Skeleton() {
+  return (
+    <span className="inline-block h-4 w-12 animate-pulse rounded bg-slate-200 align-middle" />
   );
 }
 

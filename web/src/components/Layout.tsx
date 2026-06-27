@@ -5,7 +5,7 @@ import { Button } from "./ui";
 const nav = [
   { to: "/", label: "服务列表", end: true },
   { to: "/audit", label: "操作审计", end: false },
-  { to: "/settings", label: "显示设置", end: false },
+  { to: "/settings", label: "设置", end: false },
 ];
 
 export default function Layout() {

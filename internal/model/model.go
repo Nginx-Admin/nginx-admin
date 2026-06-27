@@ -34,8 +34,13 @@ type Server struct {
 	NginxVersion     string     `json:"nginx_version"`
 	LastSeenAt       *time.Time `json:"last_seen_at"`
 	Labels           string     `gorm:"type:jsonb;default:'{}'" json:"labels"` // 分组/环境标签 JSON
-	CreatedAt        time.Time  `json:"created_at"`
-	UpdatedAt        time.Time  `json:"updated_at"`
+	// 状态快照缓存：最近一次成功拉取 Agent 状态时存下，供详情页"秒显"。
+	NginxRunning bool   `json:"nginx_running"`
+	MasterPID    int32  `json:"master_pid"`
+	LastTestOk   bool   `json:"last_test_ok"`
+	ConfigRoot   string `json:"config_root"`
+	CreatedAt    time.Time `json:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
 }
 
 // ConfigFile 配置文件索引。
@@ -83,10 +88,23 @@ type LoginAttempt struct {
 	AttemptAt time.Time `gorm:"index" json:"attempt_at"`
 }
 
+// AppSetting 是中心控制台的全局设置（key-value），可在页面修改、即时生效。
+type AppSetting struct {
+	Key       string    `gorm:"primaryKey" json:"key"`
+	Value     string    `json:"value"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+// 设置项 key 常量。
+const (
+	SettingRetainPerFile = "backup.retain_per_file" // 中心备份每文件保留份数
+)
+
 // AllModels 返回所有需迁移的模型。
 func AllModels() []any {
 	return []any{
 		&User{}, &Server{}, &ConfigFile{}, &Backup{}, &AuditLog{}, &LoginAttempt{},
+		&AppSetting{},
 	}
 }
 

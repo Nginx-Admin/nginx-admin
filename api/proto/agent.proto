@@ -20,6 +20,10 @@ service AgentService {
 
   rpc ListBackups(ListBackupsRequest) returns (ListBackupsReply);
   rpc Rollback(RollbackRequest) returns (RollbackReply);
+
+  // Agent 本地设置（可由中心远程读写）
+  rpc GetAgentSettings(GetAgentSettingsRequest) returns (AgentSettingsReply);
+  rpc UpdateAgentSettings(UpdateAgentSettingsRequest) returns (AgentSettingsReply);
 }
 
 message PingRequest {}
@@ -113,4 +117,18 @@ message RollbackReply {
   bool ok = 1;
   string output = 2;
   string error = 3;
+}
+
+message GetAgentSettingsRequest {}
+
+message UpdateAgentSettingsRequest {
+  int32 backup_retain = 1;
+  bool allow_main_config = 2;
+  string actor = 3;
+}
+
+message AgentSettingsReply {
+  int32 backup_retain = 1;
+  bool allow_main_config = 2;
+  bool allow_main_config_remote = 3;
 }

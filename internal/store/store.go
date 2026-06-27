@@ -3,6 +3,7 @@ package store
 import (
 	"errors"
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/google/uuid"
@@ -126,6 +127,21 @@ func (s *Store) TouchServer(id, version, status string) error {
 		Updates(map[string]any{"status": status, "nginx_version": version, "last_seen_at": now}).Error
 }
 
+// SaveServerStatus 缓存一次完整的 Agent 状态快照（供详情页"秒显"）。
+func (s *Store) SaveServerStatus(id string, st model.Server) error {
+	now := time.Now()
+	return s.db.Model(&model.Server{}).Where("id = ?", id).
+		Updates(map[string]any{
+			"status":        "online",
+			"nginx_version": st.NginxVersion,
+			"nginx_running": st.NginxRunning,
+			"master_pid":    st.MasterPID,
+			"last_test_ok":  st.LastTestOk,
+			"config_root":   st.ConfigRoot,
+			"last_seen_at":  now,
+		}).Error
+}
+
 // ---------- ConfigFile ----------
 
 func (s *Store) UpsertConfigFile(serverID, logicalPath, checksum string) (*model.ConfigFile, error) {
@@ -195,13 +211,15 @@ func (s *Store) SaveBackup(b *model.Backup) error {
 	return s.pruneBackups(b.ServerID, b.LogicalPath)
 }
 
-// pruneBackups 保留 (server, logicalPath) 最近 retainPerFile 份。
+// pruneBackups 保留 (server, logicalPath) 最近 N 份。N 取自设置（可页面修改），
+// 兜底用初始化时的 retainPerFile。
 func (s *Store) pruneBackups(serverID, logicalPath string) error {
+	keep := s.RetainPerFile()
 	var ids []string
 	err := s.db.Model(&model.Backup{}).
 		Where("server_id = ? AND logical_path = ?", serverID, logicalPath).
 		Order("created_at desc").
-		Offset(s.retainPerFile).
+		Offset(keep).
 		Pluck("id", &ids).Error
 	if err != nil {
 		return err
@@ -210,6 +228,36 @@ func (s *Store) pruneBackups(serverID, logicalPath string) error {
 		return nil
 	}
 	return s.db.Delete(&model.Backup{}, "id IN ?", ids).Error
+}
+
+// ---------- 设置（AppSetting） ----------
+
+// GetSetting 读取设置值，不存在返回空字符串。
+func (s *Store) GetSetting(key string) (string, error) {
+	var row model.AppSetting
+	err := s.db.First(&row, "key = ?", key).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return "", nil
+	}
+	return row.Value, err
+}
+
+// SetSetting 写入/更新设置值。
+func (s *Store) SetSetting(key, value string) error {
+	return s.db.Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "key"}},
+		DoUpdates: clause.AssignmentColumns([]string{"value", "updated_at"}),
+	}).Create(&model.AppSetting{Key: key, Value: value, UpdatedAt: time.Now()}).Error
+}
+
+// RetainPerFile 返回中心备份保留份数：优先读设置，无效则用初始化兜底值。
+func (s *Store) RetainPerFile() int {
+	if v, err := s.GetSetting(model.SettingRetainPerFile); err == nil && v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			return n
+		}
+	}
+	return s.retainPerFile
 }
 
 func (s *Store) ListBackups(serverID, logicalPath string) ([]model.Backup, error) {

@@ -59,6 +59,10 @@ func (s *Server) Router() *gin.Engine {
 			authed.PUT("/servers/:id", s.RequireRole("admin"), s.handleUpdateServer)
 			authed.DELETE("/servers/:id", s.RequireRole("admin"), s.handleDeleteServer)
 			authed.GET("/servers/:id/status", s.handleServerStatus)
+			authed.GET("/servers/:id/status/cached", s.handleServerStatusCached) // 缓存状态，秒返回
+			// Agent 本地设置（快照保留、主配置编辑开关）
+			authed.GET("/servers/:id/agent-settings", s.handleGetAgentSettings)
+			authed.PUT("/servers/:id/agent-settings", s.RequireRole("admin"), s.handleUpdateAgentSettings)
 			authed.POST("/servers/:id/discover", s.RequireRole("editor"), s.handleDiscover)
 
 			// 配置
@@ -79,6 +83,10 @@ func (s *Server) Router() *gin.Engine {
 
 			// 审计
 			authed.GET("/audit", s.handleListAudit)
+
+			// 全局设置
+			authed.GET("/settings", s.handleGetSettings)
+			authed.PUT("/settings", s.RequireRole("admin"), s.handleUpdateSettings)
 		}
 	}
 

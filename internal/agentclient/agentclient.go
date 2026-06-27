@@ -182,6 +182,24 @@ func (c *Client) Rollback(ctx context.Context, address string, req *pb.RollbackR
 	return cli.Rollback(cctx, req)
 }
 
+func (c *Client) GetAgentSettings(ctx context.Context, address string) (*pb.AgentSettingsReply, error) {
+	cli, cctx, cancel, err := c.withClient(ctx, address)
+	if err != nil {
+		return nil, err
+	}
+	defer cancel()
+	return cli.GetAgentSettings(cctx, &pb.GetAgentSettingsRequest{})
+}
+
+func (c *Client) UpdateAgentSettings(ctx context.Context, address string, req *pb.UpdateAgentSettingsRequest) (*pb.AgentSettingsReply, error) {
+	cli, cctx, cancel, err := c.withClient(ctx, address)
+	if err != nil {
+		return nil, err
+	}
+	defer cancel()
+	return cli.UpdateAgentSettings(cctx, req)
+}
+
 // Close 关闭所有连接。
 func (c *Client) Close() {
 	c.mu.Lock()
