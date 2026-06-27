@@ -40,6 +40,19 @@ export default function ConfigEditor() {
   const [simPath, setSimPath] = useState("");
   const [matchedPath, setMatchedPath] = useState<NodePath | null>(null);
 
+  // 全局 upstream 名单（跨文件，供画布连线指向外部文件定义的 upstream）
+  const [externalUpstreams, setExternalUpstreams] = useState<
+    { name: string; logical_path: string }[]
+  >([]);
+
+  // 拉取全局 upstream 名单（失败不阻塞画布）
+  useEffect(() => {
+    api
+      .listUpstreams(id)
+      .then((r) => setExternalUpstreams(r.upstreams || []))
+      .catch(() => setExternalUpstreams([]));
+  }, [id]);
+
   const load = useCallback(async () => {
     setLoading(true);
     setErr("");
@@ -221,6 +234,7 @@ export default function ConfigEditor() {
                     selectedPath={selectedPath}
                     onSelect={setSelectedPath}
                     matchedPath={matchedPath}
+                    externalUpstreams={externalUpstreams}
                   />
                 </ReactFlowProvider>
               )}

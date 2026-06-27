@@ -63,6 +63,7 @@ func (s *Server) Router() *gin.Engine {
 
 			// 配置
 			authed.GET("/servers/:id/configs", s.handleListConfigs)
+			authed.GET("/servers/:id/upstreams", s.handleListUpstreams) // 全局 upstream 汇总（跨文件）
 			authed.GET("/servers/:id/config", s.handleReadConfig) // ?path=
 			authed.PUT("/servers/:id/config", s.RequireRole("editor"), s.handleWriteConfig)
 			authed.POST("/servers/:id/test", s.RequireRole("editor"), s.handleTest)

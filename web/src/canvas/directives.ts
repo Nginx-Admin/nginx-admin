@@ -225,9 +225,17 @@ function extractServer(node: Directive, path: NodePath): FlowServer {
   const locations: FlowLocation[] = [];
 
   (node.block || []).forEach((c, i) => {
+    // return 30x https://...
     if (c.directive === "return") {
       const joined = c.args.join(" ");
-      if (/^30[12]\s+https:\/\//i.test(joined) || /https:\/\//i.test(joined)) {
+      if (/https:\/\//i.test(joined)) {
+        isHttpRedirect = true;
+      }
+    }
+    // rewrite ... https://... (permanent/redirect)
+    if (c.directive === "rewrite") {
+      const joined = c.args.join(" ");
+      if (/https:\/\//i.test(joined)) {
         isHttpRedirect = true;
       }
     }

@@ -185,6 +185,12 @@ export const api = {
   // 配置
   listConfigs: (id: string) =>
     request<{ files: ConfigFileInfo[] }>("GET", `/servers/${id}/configs`),
+  // 全局 upstream 汇总（跨文件，供画布连线）
+  listUpstreams: (id: string) =>
+    request<{ upstreams: { name: string; logical_path: string }[] }>(
+      "GET",
+      `/servers/${id}/upstreams`
+    ),
   readConfig: (id: string, path: string) =>
     request<ReadConfigResp>(
       "GET",

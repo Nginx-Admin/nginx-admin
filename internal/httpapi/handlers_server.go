@@ -3,6 +3,7 @@ package httpapi
 import (
 	"fmt"
 	"net/http"
+	"regexp"
 	"sync"
 
 	"github.com/gin-gonic/gin"
@@ -10,6 +11,9 @@ import (
 	"nginx-admin/internal/model"
 	"nginx-admin/internal/pb"
 )
+
+// upstreamDeclRe 匹配 upstream 块声明：upstream <name> {
+var upstreamDeclRe = regexp.MustCompile(`(?m)^\s*upstream\s+([^\s{]+)\s*\{`)
 
 func (s *Server) handleListServers(c *gin.Context) {
 	rows, err := s.store.ListServers()
@@ -132,6 +136,70 @@ func (s *Server) handleDiscover(c *gin.Context) {
 	s.audit(currentClaims(c).UserID, srv.ID, "config.discover", srv.Name,
 		"success", fmt.Sprintf("发现 %d 个文件", len(rep.GetFiles())))
 	c.JSON(http.StatusOK, gin.H{"files": rep.GetFiles(), "server_names": rep.GetServerNames()})
+}
+
+// handleListUpstreams 汇总该服务器上「所有配置文件」里定义的 upstream。
+// 用途：画布渲染单个文件时，proxy_pass 指向的 upstream 可能定义在别的文件
+// （如 conf.d/upstream.conf 经 include 进来）。前端据此把跨文件的 upstream
+// 也连成节点。实现：discover 全部文件 → 并发读取 → 正则提取 upstream 名。
+func (s *Server) handleListUpstreams(c *gin.Context) {
+	srv := s.mustServer(c)
+	if srv == nil {
+		return
+	}
+	rep, err := s.agents.Discover(c.Request.Context(), srv.Address)
+	if err != nil {
+		c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
+		return
+	}
+
+	type upstreamInfo struct {
+		Name        string `json:"name"`
+		LogicalPath string `json:"logical_path"` // 定义所在文件
+	}
+	var (
+		mu   sync.Mutex
+		all  []upstreamInfo
+		wg   sync.WaitGroup
+		sem  = make(chan struct{}, 8)
+	)
+	for _, f := range rep.GetFiles() {
+		path := f.GetLogicalPath()
+		wg.Add(1)
+		go func(path string) {
+			defer wg.Done()
+			sem <- struct{}{}
+			defer func() { <-sem }()
+			r, err := s.agents.ReadConfig(c.Request.Context(), srv.Address, path)
+			if err != nil {
+				return
+			}
+			names := extractUpstreamNames(r.GetContent())
+			if len(names) == 0 {
+				return
+			}
+			mu.Lock()
+			for _, n := range names {
+				all = append(all, upstreamInfo{Name: n, LogicalPath: path})
+			}
+			mu.Unlock()
+		}(path)
+	}
+	wg.Wait()
+
+	c.JSON(http.StatusOK, gin.H{"upstreams": all})
+}
+
+// extractUpstreamNames 从配置内容提取所有 upstream 块名。
+func extractUpstreamNames(content []byte) []string {
+	matches := upstreamDeclRe.FindAllSubmatch(content, -1)
+	out := make([]string, 0, len(matches))
+	for _, m := range matches {
+		if len(m) >= 2 {
+			out = append(out, string(m[1]))
+		}
+	}
+	return out
 }
 
 func (s *Server) handleListConfigs(c *gin.Context) {
