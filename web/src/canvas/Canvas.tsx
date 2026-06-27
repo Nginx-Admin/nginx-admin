@@ -73,7 +73,8 @@ function toFlow(
     }
 
     const ROW_H = 96; // 每个引用方行高
-    const GROUP_GAP = 48; // 组间距
+    const GROUP_GAP = 64; // 组间距（拉大让分组更分明）
+    const UPSTREAM_X = 720; // upstream 列 X（refMode 下拉近，缩短连线跨度）
     const palette = [
       "#0ea5e9",
       "#8b5cf6",
@@ -99,7 +100,7 @@ function toFlow(
       nodes.push({
         id: upstreamNodeId,
         type: "blockNode",
-        position: { x: 980, y: cursorY + (groupH - 70) / 2 },
+        position: { x: UPSTREAM_X, y: cursorY + (groupH - 70) / 2 },
         data: {
           kind: "upstream",
           title: `upstream ${u.name}`,
@@ -135,8 +136,9 @@ function toFlow(
           id: `${refNodeId}-${upstreamNodeId}`,
           source: refNodeId,
           target: upstreamNodeId,
-          type: "smoothstep",
-          style: { stroke: color, strokeWidth: 1.5 },
+          // 用贝塞尔曲线而非 smoothstep：避免所有竖直段叠在中线糊成一团
+          type: "default",
+          style: { stroke: color, strokeWidth: 2 },
         });
       });
 
@@ -340,7 +342,7 @@ export default function Canvas({
       edges={styledEdges}
       nodeTypes={nodeTypes}
       onNodeClick={handleNodeClick}
-      onNodeMouseEnter={(_, n) => setHoverId(n.id)}
+      onNodeMouseEnter={(_: unknown, n: Node) => setHoverId(n.id)}
       onNodeMouseLeave={() => setHoverId(null)}
       onPaneClick={() => onSelect(null)}
       fitView
