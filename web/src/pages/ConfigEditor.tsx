@@ -45,12 +45,27 @@ export default function ConfigEditor() {
     { name: string; logical_path: string }[]
   >([]);
 
-  // 拉取全局 upstream 名单（失败不阻塞画布）
+  // upstream 反向引用（谁用了某 upstream），供打开 upstream 文件时展示引用方
+  const [upstreamRefs, setUpstreamRefs] = useState<
+    {
+      upstream: string;
+      logical_path: string;
+      server_name: string;
+      location: string;
+      proxy_pass: string;
+    }[]
+  >([]);
+
+  // 拉取全局 upstream 名单 + 反向引用（失败不阻塞画布）
   useEffect(() => {
     api
       .listUpstreams(id)
       .then((r) => setExternalUpstreams(r.upstreams || []))
       .catch(() => setExternalUpstreams([]));
+    api
+      .listUpstreamRefs(id)
+      .then((r) => setUpstreamRefs(r.refs || []))
+      .catch(() => setUpstreamRefs([]));
   }, [id]);
 
   const load = useCallback(async () => {
@@ -235,6 +250,7 @@ export default function ConfigEditor() {
                     onSelect={setSelectedPath}
                     matchedPath={matchedPath}
                     externalUpstreams={externalUpstreams}
+                    upstreamRefs={upstreamRefs}
                   />
                 </ReactFlowProvider>
               )}

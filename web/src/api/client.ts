@@ -194,6 +194,17 @@ export const api = {
       "GET",
       `/servers/${id}/upstreams`
     ),
+  // upstream 反向引用：谁（哪个文件的 server/location）用了某 upstream
+  listUpstreamRefs: (id: string) =>
+    request<{
+      refs: {
+        upstream: string;
+        logical_path: string;
+        server_name: string;
+        location: string;
+        proxy_pass: string;
+      }[];
+    }>("GET", `/servers/${id}/upstream-refs`),
   readConfig: (id: string, path: string) =>
     request<ReadConfigResp>(
       "GET",

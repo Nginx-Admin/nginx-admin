@@ -16,12 +16,21 @@ import {
   type NodePath,
 } from "./directives";
 
+interface UpstreamRef {
+  upstream: string;
+  logical_path: string;
+  server_name: string;
+  location: string;
+  proxy_pass: string;
+}
+
 interface Props {
   dirs: Directive[];
   selectedPath: NodePath | null;
   onSelect: (path: NodePath | null) => void;
   matchedPath?: NodePath | null;
   externalUpstreams?: { name: string; logical_path: string }[];
+  upstreamRefs?: UpstreamRef[];
 }
 
 const samePath = (a: NodePath | null | undefined, b: NodePath | null | undefined) =>
@@ -32,7 +41,8 @@ const nid = (p: NodePath) => "n-" + p.join("-");
 function toFlow(
   dirs: Directive[],
   matchedPath?: NodePath | null,
-  externalUpstreams: { name: string; logical_path: string }[] = []
+  externalUpstreams: { name: string; logical_path: string }[] = [],
+  upstreamRefs: UpstreamRef[] = []
 ): { nodes: Node[]; edges: Edge[] } {
   const model = buildFlowModel(dirs);
   const nodes: Node[] = [];
@@ -56,6 +66,59 @@ function toFlow(
       },
     });
   });
+
+  // 反向引用：对本文件内定义的每个 upstream，把"引用了它的 server/location"
+  // （来自其它文件）也画出来，连线表示引用关系。
+  // 典型场景：打开 upstream.conf 时，展示哪些 server/location 用了这些 upstream。
+  if (model.upstreams.length > 0 && upstreamRefs.length > 0) {
+    const localUpstreamNames = new Set(model.upstreams.map((u) => u.name));
+    let refIdx = 0;
+    // 去重：同一 (文件,server,location,upstream) 只画一个引用节点
+    const seen = new Set<string>();
+    for (const ref of upstreamRefs) {
+      if (!localUpstreamNames.has(ref.upstream)) continue;
+      const key = `${ref.logical_path}|${ref.server_name}|${ref.location}|${ref.upstream}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+
+      const refNodeId = `ref-${refIdx}`;
+      const targetUpstream = upstreamId.get(ref.upstream)!;
+      const title = ref.location
+        ? `location ${ref.location}`
+        : ref.server_name
+          ? `server ${ref.server_name}`
+          : "引用方";
+      const subtitle = [
+        ref.server_name && `server ${ref.server_name}`,
+        `来自 ${ref.logical_path}`,
+      ]
+        .filter(Boolean)
+        .join(" · ");
+
+      nodes.push({
+        id: refNodeId,
+        type: "locationNode",
+        position: { x: 60, y: 40 + refIdx * 110 },
+        data: {
+          kind: "location",
+          title,
+          subtitle,
+          external: true,
+        },
+      });
+      edges.push({
+        id: `${refNodeId}-${targetUpstream}`,
+        source: refNodeId,
+        target: targetUpstream,
+        type: "smoothstep",
+        animated: true,
+        label: "引用",
+        style: { strokeDasharray: "4 4", stroke: "#0ea5e9" },
+        labelStyle: { fill: "#0369a1", fontSize: 10 },
+      });
+      refIdx++;
+    }
+  }
 
   // 外部文件定义的 upstream：名字 → 定义所在文件。用于跨文件连线。
   const externalMap = new Map<string, string>();
@@ -195,10 +258,11 @@ export default function Canvas({
   onSelect,
   matchedPath,
   externalUpstreams,
+  upstreamRefs,
 }: Props) {
   const { nodes, edges } = useMemo(
-    () => toFlow(dirs, matchedPath, externalUpstreams),
-    [dirs, matchedPath, externalUpstreams]
+    () => toFlow(dirs, matchedPath, externalUpstreams, upstreamRefs),
+    [dirs, matchedPath, externalUpstreams, upstreamRefs]
   );
 
   const styledNodes = nodes.map((n) => ({

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"regexp"
+	"strings"
 	"sync"
 
 	"github.com/gin-gonic/gin"
@@ -225,6 +226,115 @@ func extractUpstreamNames(content []byte) []string {
 	for _, m := range matches {
 		if len(m) >= 2 {
 			out = append(out, string(m[1]))
+		}
+	}
+	return out
+}
+
+// UpstreamRef 是对某个 upstream 的一处引用（哪个文件、哪个 server、哪个 location）。
+type UpstreamRef struct {
+	Upstream    string `json:"upstream"`     // 被引用的 upstream 名
+	LogicalPath string `json:"logical_path"` // 引用所在文件
+	ServerName  string `json:"server_name"`  // 所属 server 的 server_name（可空）
+	Location    string `json:"location"`     // 所属 location 匹配串（可空）
+	ProxyPass   string `json:"proxy_pass"`   // 原始 proxy_pass 目标
+}
+
+var (
+	serverNameLineRe = regexp.MustCompile(`(?m)^\s*server_name\s+([^;]+);`)
+	locationLineRe   = regexp.MustCompile(`(?m)^\s*location\s+([^{]+)\{`)
+	proxyPassLineRe  = regexp.MustCompile(`(?m)^\s*proxy_pass\s+(https?://([^/;:\s]+)[^;]*);`)
+)
+
+// handleUpstreamRefs 反向引用：扫描该服务器所有配置文件，找出每个 proxy_pass
+// 引用的 upstream 及其上下文（server_name / location / 文件）。
+// 用途：打开 upstream.conf 时，画布据此把"引用了这些 upstream 的 server/location"
+// 也展示出来。
+func (s *Server) handleUpstreamRefs(c *gin.Context) {
+	srv := s.mustServer(c)
+	if srv == nil {
+		return
+	}
+	rep, err := s.agents.Discover(c.Request.Context(), srv.Address)
+	if err != nil {
+		c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
+		return
+	}
+
+	var (
+		mu   sync.Mutex
+		refs []UpstreamRef
+		wg   sync.WaitGroup
+		sem  = make(chan struct{}, 8)
+	)
+	for _, f := range rep.GetFiles() {
+		path := f.GetLogicalPath()
+		wg.Add(1)
+		go func(path string) {
+			defer wg.Done()
+			sem <- struct{}{}
+			defer func() { <-sem }()
+			r, err := s.agents.ReadConfig(c.Request.Context(), srv.Address, path)
+			if err != nil {
+				return
+			}
+			found := extractUpstreamRefs(path, r.GetContent())
+			if len(found) == 0 {
+				return
+			}
+			mu.Lock()
+			refs = append(refs, found...)
+			mu.Unlock()
+		}(path)
+	}
+	wg.Wait()
+
+	c.JSON(http.StatusOK, gin.H{"refs": refs})
+}
+
+// extractUpstreamRefs 逐行扫描配置，跟踪当前 server_name / location，
+// 对每个 proxy_pass http://X 记录一条引用（X 即被引用的 upstream 名或主机名）。
+func extractUpstreamRefs(logicalPath string, content []byte) []UpstreamRef {
+	lines := strings.Split(string(content), "\n")
+	var out []UpstreamRef
+	curServer := ""
+	curLocation := ""
+	depth := 0
+	serverDepth := -1
+	locationDepth := -1
+
+	for _, raw := range lines {
+		line := strings.TrimSpace(raw)
+
+		if m := serverNameLineRe.FindStringSubmatch(line + ";"); m != nil && strings.HasPrefix(line, "server_name") {
+			curServer = strings.TrimSpace(strings.Fields(m[1])[0])
+		}
+		if m := locationLineRe.FindStringSubmatch(line + "{"); m != nil && strings.HasPrefix(line, "location") {
+			curLocation = strings.TrimSpace(m[1])
+			locationDepth = depth
+		}
+		if strings.HasPrefix(line, "server") && strings.Contains(line, "{") {
+			serverDepth = depth
+		}
+		if m := proxyPassLineRe.FindStringSubmatch(line + ";"); m != nil && strings.HasPrefix(line, "proxy_pass") {
+			out = append(out, UpstreamRef{
+				Upstream:    m[2], // http://X 里的 X
+				LogicalPath: logicalPath,
+				ServerName:  curServer,
+				Location:    curLocation,
+				ProxyPass:   m[1],
+			})
+		}
+
+		// 维护花括号深度，离开 location/server 块时清空上下文
+		depth += strings.Count(line, "{") - strings.Count(line, "}")
+		if locationDepth >= 0 && depth <= locationDepth {
+			curLocation = ""
+			locationDepth = -1
+		}
+		if serverDepth >= 0 && depth <= serverDepth {
+			curServer = ""
+			serverDepth = -1
 		}
 	}
 	return out
