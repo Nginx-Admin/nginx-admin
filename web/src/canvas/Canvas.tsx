@@ -111,7 +111,7 @@ function toFlow(
         },
       });
 
-      // 引用方节点：在该组高度区间内逐行排列，连线用该组颜色
+      // 引用方节点：在该组高度区间内逐行排列
       refs.forEach((ref, ri) => {
         const refNodeId = `ref-${refIdx++}`;
         const title = ref.location
@@ -119,7 +119,9 @@ function toFlow(
           : ref.server_name
             ? `server ${ref.server_name}`
             : "引用方";
+        // 副标题展示 proxy_pass 内容 + 来源（server / 文件）
         const subtitle = [
+          ref.proxy_pass && `proxy_pass ${ref.proxy_pass}`,
           ref.server_name && `server ${ref.server_name}`,
           `来自 ${ref.logical_path}`,
         ]
@@ -130,15 +132,15 @@ function toFlow(
           id: refNodeId,
           type: "locationNode",
           position: { x: 60, y: cursorY + ri * ROW_H },
-          data: { kind: "location", title, subtitle, external: true, accent: color },
+          data: { kind: "location", title, subtitle, external: true },
         });
+        // 连线风格与 location → upstream 统一（smoothstep + animated）
         edges.push({
           id: `${refNodeId}-${upstreamNodeId}`,
           source: refNodeId,
           target: upstreamNodeId,
-          // 用贝塞尔曲线而非 smoothstep：避免所有竖直段叠在中线糊成一团
-          type: "default",
-          style: { stroke: color, strokeWidth: 2 },
+          type: "smoothstep",
+          animated: true,
         });
       });
 
@@ -312,24 +314,38 @@ export default function Canvas({
   // hover 高亮：悬停某节点时，只突出与它相连的边，其余淡化
   const [hoverId, setHoverId] = useState<string | null>(null);
 
-  const styledNodes = nodes.map((n) => ({
-    ...n,
-    selected: samePath(selectedPath, (n.data as { path?: NodePath }).path),
-  }));
+  // 节点样式用 useMemo 缓存，且不依赖 hoverId——
+  // 这样 hover 时节点数组引用不变、不重建，避免打断正在进行的点击。
+  // 注意：只有「有 path」的节点（当前文件的真实块）才由 selectedPath 受控高亮；
+  // 引用节点 / 外部 upstream 节点没有 path，交给 React Flow 原生 selected 管理，
+  // 否则会与原生选中态冲突，出现「点击不高亮、移开才高亮」。
+  const styledNodes = useMemo(
+    () =>
+      nodes.map((n) => {
+        const path = (n.data as { path?: NodePath }).path;
+        if (!path) return n; // 无 path：保留 React Flow 原生 selected
+        return { ...n, selected: samePath(selectedPath, path) };
+      }),
+    [nodes, selectedPath]
+  );
 
-  const styledEdges = edges.map((e) => {
-    if (!hoverId) return e;
-    const related = e.source === hoverId || e.target === hoverId;
-    return {
-      ...e,
-      style: {
-        ...e.style,
-        opacity: related ? 1 : 0.12,
-        strokeWidth: related ? 2.5 : (e.style?.strokeWidth ?? 1.5),
-      },
-      animated: related,
-    };
-  });
+  // 边样式随 hoverId 变化（只影响边，不影响节点点击）。
+  const styledEdges = useMemo(
+    () =>
+      edges.map((e) => {
+        if (!hoverId) return e;
+        const related = e.source === hoverId || e.target === hoverId;
+        return {
+          ...e,
+          style: {
+            ...e.style,
+            opacity: related ? 1 : 0.12,
+            strokeWidth: related ? 2.5 : (e.style?.strokeWidth ?? 1.5),
+          },
+        };
+      }),
+    [edges, hoverId]
+  );
 
   const handleNodeClick = (_: unknown, node: Node) => {
     const p = (node.data as { path?: NodePath }).path;

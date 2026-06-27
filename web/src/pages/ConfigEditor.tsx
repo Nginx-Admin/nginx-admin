@@ -6,7 +6,6 @@ import { Button } from "../components/ui";
 import { useAuth } from "../auth/AuthContext";
 import Canvas from "../canvas/Canvas";
 import PropertyPanel from "../canvas/PropertyPanel";
-import { matchLocation } from "../canvas/matcher";
 import type { NodePath } from "../canvas/directives";
 
 type Mode = "canvas" | "source";
@@ -35,10 +34,6 @@ export default function ConfigEditor() {
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState("");
   const [err, setErr] = useState("");
-
-  // 流量模拟
-  const [simPath, setSimPath] = useState("");
-  const [matchedPath, setMatchedPath] = useState<NodePath | null>(null);
 
   // 全局 upstream 名单（跨文件，供画布连线指向外部文件定义的 upstream）
   const [externalUpstreams, setExternalUpstreams] = useState<
@@ -121,22 +116,10 @@ export default function ConfigEditor() {
       const p = await api.parseConfig(source);
       setDirs(p.directives);
       setSelectedPath(null);
-      setMatchedPath(null);
       setMode("canvas");
     } catch (e) {
       setErr("配置解析失败（请检查语法，或留在源码模式）：" + (e as Error).message);
     }
-  };
-
-  const runSim = () => {
-    if (!dirs || !simPath) {
-      setMatchedPath(null);
-      return;
-    }
-    const m = matchLocation(dirs, simPath);
-    setMatchedPath(m);
-    if (!m) setMsg(`路径 ${simPath} 未匹配到任何 location`);
-    else setMsg("");
   };
 
   const save = async () => {
@@ -205,20 +188,6 @@ export default function ConfigEditor() {
         </div>
 
         <div className="ml-auto flex items-center gap-2">
-          {mode === "canvas" && (
-            <div className="flex items-center gap-1">
-              <input
-                className="w-44 rounded-md border border-slate-300 px-2 py-1 text-sm"
-                placeholder="模拟请求路径 /api/users"
-                value={simPath}
-                onChange={(e) => setSimPath(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && runSim()}
-              />
-              <Button variant="secondary" onClick={runSim}>
-                模拟匹配
-              </Button>
-            </div>
-          )}
           {canEdit && (
             <Button onClick={save} disabled={saving}>
               {saving ? "保存中..." : "保存并应用"}
@@ -248,7 +217,6 @@ export default function ConfigEditor() {
                     dirs={dirs}
                     selectedPath={selectedPath}
                     onSelect={setSelectedPath}
-                    matchedPath={matchedPath}
                     externalUpstreams={externalUpstreams}
                     upstreamRefs={upstreamRefs}
                   />
