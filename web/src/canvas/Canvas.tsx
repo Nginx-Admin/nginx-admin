@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import {
   ReactFlow,
   Background,
@@ -50,74 +50,116 @@ function toFlow(
 
   // upstream 名 → nodeId（右列）。本文件内定义的 upstream。
   const upstreamId = new Map<string, string>();
-  model.upstreams.forEach((u, i) => {
-    const id = nid(u.path);
-    upstreamId.set(u.name, id);
-    nodes.push({
-      id,
-      type: "blockNode",
-      position: { x: 980, y: 40 + i * 130 },
-      data: {
-        kind: "upstream",
-        title: `upstream ${u.name}`,
-        subtitle: `${(u.node.block || []).length} 条指令`,
-        matched: samePath(matchedPath, u.path),
-        path: u.path,
-      },
-    });
-  });
 
-  // 反向引用：对本文件内定义的每个 upstream，把"引用了它的 server/location"
-  // （来自其它文件）也画出来，连线表示引用关系。
-  // 典型场景：打开 upstream.conf 时，展示哪些 server/location 用了这些 upstream。
-  if (model.upstreams.length > 0 && upstreamRefs.length > 0) {
-    const localUpstreamNames = new Set(model.upstreams.map((u) => u.name));
-    let refIdx = 0;
-    // 去重：同一 (文件,server,location,upstream) 只画一个引用节点
+  // 反向引用模式：当本文件定义了 upstream 且存在引用数据时，
+  // 按「每个 upstream 一组」布局——该 upstream 居右，引用它的 location 居左同高，
+  // 形成一束短平连线，清晰对应（解决多 upstream 连线糊成一团的问题）。
+  const localUpstreamNames = new Set(model.upstreams.map((u) => u.name));
+  const refModeOn =
+    model.upstreams.length > 0 &&
+    upstreamRefs.some((r) => localUpstreamNames.has(r.upstream));
+
+  if (refModeOn) {
+    // 收集每个 upstream 的去重引用方
+    const refsByUpstream = new Map<string, UpstreamRef[]>();
     const seen = new Set<string>();
     for (const ref of upstreamRefs) {
       if (!localUpstreamNames.has(ref.upstream)) continue;
       const key = `${ref.logical_path}|${ref.server_name}|${ref.location}|${ref.upstream}`;
       if (seen.has(key)) continue;
       seen.add(key);
+      if (!refsByUpstream.has(ref.upstream)) refsByUpstream.set(ref.upstream, []);
+      refsByUpstream.get(ref.upstream)!.push(ref);
+    }
 
-      const refNodeId = `ref-${refIdx}`;
-      const targetUpstream = upstreamId.get(ref.upstream)!;
-      const title = ref.location
-        ? `location ${ref.location}`
-        : ref.server_name
-          ? `server ${ref.server_name}`
-          : "引用方";
-      const subtitle = [
-        ref.server_name && `server ${ref.server_name}`,
-        `来自 ${ref.logical_path}`,
-      ]
-        .filter(Boolean)
-        .join(" · ");
+    const ROW_H = 96; // 每个引用方行高
+    const GROUP_GAP = 48; // 组间距
+    const palette = [
+      "#0ea5e9",
+      "#8b5cf6",
+      "#10b981",
+      "#f59e0b",
+      "#ef4444",
+      "#ec4899",
+      "#14b8a6",
+      "#6366f1",
+    ];
+    let cursorY = 40;
+    let refIdx = 0;
 
+    model.upstreams.forEach((u, gi) => {
+      const refs = refsByUpstream.get(u.name) || [];
+      const groupRows = Math.max(1, refs.length);
+      const groupH = groupRows * ROW_H;
+      const upstreamNodeId = nid(u.path);
+      upstreamId.set(u.name, upstreamNodeId);
+      const color = palette[gi % palette.length];
+
+      // upstream 节点：放在该组纵向中心
       nodes.push({
-        id: refNodeId,
-        type: "locationNode",
-        position: { x: 60, y: 40 + refIdx * 110 },
+        id: upstreamNodeId,
+        type: "blockNode",
+        position: { x: 980, y: cursorY + (groupH - 70) / 2 },
         data: {
-          kind: "location",
-          title,
-          subtitle,
-          external: true,
+          kind: "upstream",
+          title: `upstream ${u.name}`,
+          subtitle: `被 ${refs.length} 处引用`,
+          matched: samePath(matchedPath, u.path),
+          path: u.path,
+          accent: color,
         },
       });
-      edges.push({
-        id: `${refNodeId}-${targetUpstream}`,
-        source: refNodeId,
-        target: targetUpstream,
-        type: "smoothstep",
-        animated: true,
-        label: "引用",
-        style: { strokeDasharray: "4 4", stroke: "#0ea5e9" },
-        labelStyle: { fill: "#0369a1", fontSize: 10 },
+
+      // 引用方节点：在该组高度区间内逐行排列，连线用该组颜色
+      refs.forEach((ref, ri) => {
+        const refNodeId = `ref-${refIdx++}`;
+        const title = ref.location
+          ? `location ${ref.location}`
+          : ref.server_name
+            ? `server ${ref.server_name}`
+            : "引用方";
+        const subtitle = [
+          ref.server_name && `server ${ref.server_name}`,
+          `来自 ${ref.logical_path}`,
+        ]
+          .filter(Boolean)
+          .join(" · ");
+
+        nodes.push({
+          id: refNodeId,
+          type: "locationNode",
+          position: { x: 60, y: cursorY + ri * ROW_H },
+          data: { kind: "location", title, subtitle, external: true, accent: color },
+        });
+        edges.push({
+          id: `${refNodeId}-${upstreamNodeId}`,
+          source: refNodeId,
+          target: upstreamNodeId,
+          type: "smoothstep",
+          style: { stroke: color, strokeWidth: 1.5 },
+        });
       });
-      refIdx++;
-    }
+
+      cursorY += groupH + GROUP_GAP;
+    });
+  } else {
+    // 普通模式：upstream 右列依序排列
+    model.upstreams.forEach((u, i) => {
+      const id = nid(u.path);
+      upstreamId.set(u.name, id);
+      nodes.push({
+        id,
+        type: "blockNode",
+        position: { x: 980, y: 40 + i * 130 },
+        data: {
+          kind: "upstream",
+          title: `upstream ${u.name}`,
+          subtitle: `${(u.node.block || []).length} 条指令`,
+          matched: samePath(matchedPath, u.path),
+          path: u.path,
+        },
+      });
+    });
   }
 
   // 外部文件定义的 upstream：名字 → 定义所在文件。用于跨文件连线。
@@ -265,10 +307,27 @@ export default function Canvas({
     [dirs, matchedPath, externalUpstreams, upstreamRefs]
   );
 
+  // hover 高亮：悬停某节点时，只突出与它相连的边，其余淡化
+  const [hoverId, setHoverId] = useState<string | null>(null);
+
   const styledNodes = nodes.map((n) => ({
     ...n,
     selected: samePath(selectedPath, (n.data as { path?: NodePath }).path),
   }));
+
+  const styledEdges = edges.map((e) => {
+    if (!hoverId) return e;
+    const related = e.source === hoverId || e.target === hoverId;
+    return {
+      ...e,
+      style: {
+        ...e.style,
+        opacity: related ? 1 : 0.12,
+        strokeWidth: related ? 2.5 : (e.style?.strokeWidth ?? 1.5),
+      },
+      animated: related,
+    };
+  });
 
   const handleNodeClick = (_: unknown, node: Node) => {
     const p = (node.data as { path?: NodePath }).path;
@@ -278,9 +337,11 @@ export default function Canvas({
   return (
     <ReactFlow
       nodes={styledNodes}
-      edges={edges}
+      edges={styledEdges}
       nodeTypes={nodeTypes}
       onNodeClick={handleNodeClick}
+      onNodeMouseEnter={(_, n) => setHoverId(n.id)}
+      onNodeMouseLeave={() => setHoverId(null)}
       onPaneClick={() => onSelect(null)}
       fitView
       proOptions={{ hideAttribution: true }}
