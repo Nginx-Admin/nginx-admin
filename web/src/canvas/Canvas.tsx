@@ -119,20 +119,18 @@ function toFlow(
           : ref.server_name
             ? `server ${ref.server_name}`
             : "引用方";
-        // 副标题展示 proxy_pass 内容 + 来源（server / 文件）
-        const subtitle = [
+        // 多行展示：proxy_pass / server / 来源文件，宽度自适应不截断
+        const lines = [
           ref.proxy_pass && `proxy_pass ${ref.proxy_pass}`,
           ref.server_name && `server ${ref.server_name}`,
           `来自 ${ref.logical_path}`,
-        ]
-          .filter(Boolean)
-          .join(" · ");
+        ].filter(Boolean) as string[];
 
         nodes.push({
           id: refNodeId,
           type: "locationNode",
           position: { x: 60, y: cursorY + ri * ROW_H },
-          data: { kind: "location", title, subtitle, external: true },
+          data: { kind: "location", title, lines, external: true },
         });
         // 连线风格与 location → upstream 统一（smoothstep + animated）
         edges.push({
@@ -300,7 +298,6 @@ function toFlow(
 
 export default function Canvas({
   dirs,
-  selectedPath,
   onSelect,
   matchedPath,
   externalUpstreams,
@@ -313,20 +310,13 @@ export default function Canvas({
 
   // hover 高亮：悬停某节点时，只突出与它相连的边，其余淡化
   const [hoverId, setHoverId] = useState<string | null>(null);
+  // 选中节点 id：点击即记录，用于画选中边框（自管，稳定不丢）。
+  const [selectedId, setSelectedId] = useState<string | null>(null);
 
-  // 节点样式用 useMemo 缓存，且不依赖 hoverId——
-  // 这样 hover 时节点数组引用不变、不重建，避免打断正在进行的点击。
-  // 注意：只有「有 path」的节点（当前文件的真实块）才由 selectedPath 受控高亮；
-  // 引用节点 / 外部 upstream 节点没有 path，交给 React Flow 原生 selected 管理，
-  // 否则会与原生选中态冲突，出现「点击不高亮、移开才高亮」。
+  // 据 selectedId 给节点设 selected。不依赖 hoverId，hover 不会重建节点、不打断点击。
   const styledNodes = useMemo(
-    () =>
-      nodes.map((n) => {
-        const path = (n.data as { path?: NodePath }).path;
-        if (!path) return n; // 无 path：保留 React Flow 原生 selected
-        return { ...n, selected: samePath(selectedPath, path) };
-      }),
-    [nodes, selectedPath]
+    () => nodes.map((n) => ({ ...n, selected: n.id === selectedId })),
+    [nodes, selectedId]
   );
 
   // 边样式随 hoverId 变化（只影响边，不影响节点点击）。
@@ -348,8 +338,11 @@ export default function Canvas({
   );
 
   const handleNodeClick = (_: unknown, node: Node) => {
+    setSelectedId(node.id); // 选中高亮（所有节点都生效，含引用节点）
     const p = (node.data as { path?: NodePath }).path;
-    if (p) onSelect(p);
+    // 有 path（当前文件的真实块）→ 打开右侧编辑面板；
+    // 无 path（引用节点 / 外部 upstream，不可编辑）→ 关闭面板，避免残留上一个节点的编辑框。
+    onSelect(p ?? null);
   };
 
   return (

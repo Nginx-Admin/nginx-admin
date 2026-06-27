@@ -61,17 +61,6 @@ export interface TestResp {
   output: string;
 }
 
-export interface CentralBackup {
-  id: string;
-  server_id: string;
-  logical_path: string;
-  snapshot_ref: string;
-  checksum: string;
-  created_by: string;
-  note: string;
-  created_at: string;
-}
-
 export interface LocalBackup {
   backup_ref: string;
   logical_path: string;
@@ -224,9 +213,9 @@ export const api = {
   test: (id: string) => request<TestResp>("POST", `/servers/${id}/test`),
   reload: (id: string) => request<TestResp>("POST", `/servers/${id}/reload`),
 
-  // 备份/回滚
+  // 备份/回滚（仅 Agent 本地快照）
   listBackups: (id: string, path?: string) =>
-    request<{ central: CentralBackup[]; local: LocalBackup[] }>(
+    request<{ local: LocalBackup[] }>(
       "GET",
       `/servers/${id}/backups${path ? `?path=${encodeURIComponent(path)}` : ""}`
     ),
@@ -245,13 +234,6 @@ export const api = {
     request<{ directives: Directive[] }>("POST", "/nginx/parse", { content }),
   buildConfig: (directives: Directive[]) =>
     request<{ content: string }>("POST", "/nginx/build", { directives }),
-
-  // 中心全局设置（备份保留份数）
-  getSettings: () => request<{ retain_per_file: number }>("GET", "/settings"),
-  updateSettings: (retain_per_file: number) =>
-    request<{ retain_per_file: number }>("PUT", "/settings", {
-      retain_per_file,
-    }),
 
   // Agent 本地设置（按服务器：快照保留、主配置编辑开关）
   getAgentSettings: (id: string) =>

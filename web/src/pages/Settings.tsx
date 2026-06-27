@@ -4,7 +4,7 @@ import { Button, SettingCard, SettingRow, Toggle } from "../components/ui";
 import { api, type Server } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
 
-type Tab = "display" | "backup" | "editor";
+type Tab = "display" | "editor";
 
 const TABS: {
   key: Tab;
@@ -14,13 +14,6 @@ const TABS: {
   adminOnly?: boolean;
 }[] = [
   { key: "display", label: "显示设置", desc: "界面字号与字体", icon: "🎨" },
-  {
-    key: "backup",
-    label: "备份设置",
-    desc: "中心备份保留策略",
-    icon: "🗄️",
-    adminOnly: true,
-  },
   {
     key: "editor",
     label: "编辑开关",
@@ -40,7 +33,7 @@ export default function Settings() {
     <div className="p-6">
       <h1 className="mb-1 text-xl font-semibold text-slate-800">设置</h1>
       <p className="mb-6 text-sm text-slate-500">
-        管理界面外观、备份策略与各节点的 Agent 编辑权限。
+        管理界面外观与各节点的 Agent 编辑权限。
       </p>
 
       <div className="flex gap-6">
@@ -77,7 +70,6 @@ export default function Settings() {
         {/* 右侧内容 */}
         <div className="max-w-2xl flex-1 space-y-5">
           {tab === "display" && <DisplaySettings />}
-          {tab === "backup" && isAdmin && <BackupSettings />}
           {tab === "editor" && isAdmin && <EditorToggle />}
         </div>
       </div>
@@ -212,80 +204,6 @@ function DisplaySettings() {
       <div className="flex justify-end">
         <Button variant="secondary" onClick={reset}>
           恢复默认
-        </Button>
-      </div>
-    </>
-  );
-}
-
-/* ---------------- 备份设置 ---------------- */
-function BackupSettings() {
-  const [retain, setRetain] = useState(5);
-  const [initial, setInitial] = useState(5);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [msg, setMsg] = useState("");
-  const [err, setErr] = useState("");
-
-  useEffect(() => {
-    api
-      .getSettings()
-      .then((r) => {
-        setRetain(r.retain_per_file);
-        setInitial(r.retain_per_file);
-      })
-      .catch((e) => setErr((e as Error).message))
-      .finally(() => setLoading(false));
-  }, []);
-
-  const dirty = retain !== initial;
-
-  const save = async () => {
-    setSaving(true);
-    setMsg("");
-    setErr("");
-    try {
-      const r = await api.updateSettings(retain);
-      setRetain(r.retain_per_file);
-      setInitial(r.retain_per_file);
-      setMsg("已保存");
-    } catch (e) {
-      setErr((e as Error).message);
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  if (loading) return <p className="text-slate-400">加载中...</p>;
-
-  return (
-    <>
-      <SettingCard
-        title="中心备份策略"
-        desc="写入配置时，中心会保留每个配置文件的最近 N 份内容副本，用于容灾与回滚。"
-      >
-        <SettingRow
-          label="每文件保留份数"
-          desc="超过份数的旧副本会被自动清理"
-        >
-          <div className="flex items-center gap-2">
-            <input
-              type="number"
-              min={1}
-              max={100}
-              className="w-24 rounded-md border border-slate-300 px-3 py-1.5 text-sm"
-              value={retain}
-              onChange={(e) => setRetain(Number(e.target.value))}
-            />
-            <span className="text-sm text-slate-400">份</span>
-          </div>
-        </SettingRow>
-      </SettingCard>
-
-      <Feedback msg={msg} err={err} />
-      <div className="flex justify-end">
-        <Button onClick={save} disabled={saving || !dirty}>
-          {saving ? "保存中..." : "保存"}
         </Button>
       </div>
     </>

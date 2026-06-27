@@ -445,20 +445,6 @@ func (s *Server) handleWriteConfig(c *gin.Context) {
 	}
 	claims := currentClaims(c)
 
-	// 写入前：先抓一份当前内容做中心副本（容灾）
-	if cur, err := s.agents.ReadConfig(c.Request.Context(), srv.Address, req.Path); err == nil {
-		cf, _ := s.store.UpsertConfigFile(srv.ID, req.Path, cur.GetChecksum())
-		cfID := ""
-		if cf != nil {
-			cfID = cf.ID
-		}
-		_ = s.store.SaveBackup(&model.Backup{
-			ServerID: srv.ID, ConfigFileID: cfID, LogicalPath: req.Path,
-			Content: cur.GetContent(), Checksum: cur.GetChecksum(),
-			CreatedBy: claims.UserID, Note: "写入前中心副本",
-		})
-	}
-
 	rep, err := s.agents.WriteConfig(c.Request.Context(), srv.Address, &pb.WriteConfigRequest{
 		LogicalPath:      req.Path,
 		Content:          []byte(req.Content),
@@ -517,15 +503,13 @@ func (s *Server) handleListBackups(c *gin.Context) {
 		return
 	}
 	path := c.Query("path")
-	// 中心副本
-	central, _ := s.store.ListBackups(srv.ID, path)
-	// Agent 本地快照
+	// Agent 本地快照（唯一备份来源）
 	rep, err := s.agents.ListBackups(c.Request.Context(), srv.Address, path)
-	var local []*pb.Backup
-	if err == nil {
-		local = rep.GetBackups()
+	if err != nil {
+		c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
+		return
 	}
-	c.JSON(http.StatusOK, gin.H{"central": central, "local": local})
+	c.JSON(http.StatusOK, gin.H{"local": rep.GetBackups()})
 }
 
 type rollbackReq struct {

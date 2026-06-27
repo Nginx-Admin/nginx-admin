@@ -1,7 +1,7 @@
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 
 const base =
-  "rounded-lg border bg-white shadow-sm px-3 py-2 min-w-[180px] max-w-[260px] text-xs";
+  "rounded-lg border bg-white shadow-sm px-3 py-2 min-w-[180px] text-xs";
 
 const kindColor: Record<string, string> = {
   server: "text-brand-700",
@@ -28,7 +28,7 @@ export function BlockNode({ data, selected }: NodeProps) {
     matched?: boolean;
   };
   return (
-    <div className={`${base} ${ringCls(d.matched, selected)}`}>
+    <div className={`${base} max-w-[280px] ${ringCls(d.matched, selected)}`}>
       {/* 左/右：HTTPS 跳转连线的接入/发出口 */}
       <Handle id="redirect-in" type="target" position={Position.Left} />
       <Handle id="redirect-out" type="source" position={Position.Right} />
@@ -50,19 +50,39 @@ export function BlockNode({ data, selected }: NodeProps) {
   );
 }
 
-// location 节点：展示匹配串 + 摘要（proxy_pass / root / try_files）。
+// location 节点：展示匹配串 + 摘要。
+// 普通 location 用 subtitle 单行；引用 location（external）用 lines 多行展示，宽度自适应。
 export function LocationNode({ data, selected }: NodeProps) {
   const d = data as {
     title: string;
     subtitle?: string;
+    lines?: string[]; // 多行展示（引用节点用）
+    external?: boolean;
     matched?: boolean;
   };
   return (
-    <div className={`${base} ${ringCls(d.matched, selected)}`}>
+    <div
+      className={`${base} ${
+        d.lines ? "max-w-[520px]" : "max-w-[280px]"
+      } ${ringCls(d.matched, selected)}`}
+    >
       <Handle type="target" position={Position.Left} />
       <div className="font-mono font-semibold text-sky-700">{d.title}</div>
-      {d.subtitle && (
-        <div className="mt-1 truncate text-slate-500">{d.subtitle}</div>
+      {d.lines ? (
+        <div className="mt-1 space-y-0.5">
+          {d.lines.map((ln, i) => (
+            <div
+              key={i}
+              className="whitespace-nowrap font-mono text-[11px] text-slate-500"
+            >
+              {ln}
+            </div>
+          ))}
+        </div>
+      ) : (
+        d.subtitle && (
+          <div className="mt-1 truncate text-slate-500">{d.subtitle}</div>
+        )
       )}
       <Handle type="source" position={Position.Right} />
     </div>

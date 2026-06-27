@@ -84,10 +84,6 @@ func (s *Server) Router() *gin.Engine {
 
 			// 审计
 			authed.GET("/audit", s.handleListAudit)
-
-			// 全局设置
-			authed.GET("/settings", s.handleGetSettings)
-			authed.PUT("/settings", s.RequireRole("admin"), s.handleUpdateSettings)
 		}
 	}
 
