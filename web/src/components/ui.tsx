@@ -55,3 +55,77 @@ export function statusBadge(status: string) {
       return <Badge color="bg-slate-100 text-slate-600">未知</Badge>;
   }
 }
+
+/* ---------- 设置页通用组件 ---------- */
+
+// Toggle 专业开关。
+export function Toggle({
+  checked,
+  onChange,
+  disabled,
+}: {
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  disabled?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      disabled={disabled}
+      onClick={() => onChange(!checked)}
+      className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+        checked ? "bg-brand-600" : "bg-slate-300"
+      }`}
+    >
+      <span
+        className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${
+          checked ? "translate-x-5" : "translate-x-0.5"
+        }`}
+      />
+    </button>
+  );
+}
+
+// SettingCard 带标题与说明的分区卡片。
+export function SettingCard({
+  title,
+  desc,
+  children,
+}: {
+  title: string;
+  desc?: string;
+  children: ReactNode;
+}) {
+  return (
+    <section className="rounded-xl border border-slate-200 bg-white shadow-sm">
+      <div className="border-b border-slate-100 px-5 py-4">
+        <h2 className="text-sm font-semibold text-slate-800">{title}</h2>
+        {desc && <p className="mt-0.5 text-xs text-slate-500">{desc}</p>}
+      </div>
+      <div className="divide-y divide-slate-100">{children}</div>
+    </section>
+  );
+}
+
+// SettingRow 一行设置项：左侧 label+说明，右侧控件。
+export function SettingRow({
+  label,
+  desc,
+  children,
+}: {
+  label: string;
+  desc?: string;
+  children: ReactNode;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-4 px-5 py-4">
+      <div className="min-w-0">
+        <div className="text-sm font-medium text-slate-700">{label}</div>
+        {desc && <div className="mt-0.5 text-xs text-slate-400">{desc}</div>}
+      </div>
+      <div className="shrink-0">{children}</div>
+    </div>
+  );
+}

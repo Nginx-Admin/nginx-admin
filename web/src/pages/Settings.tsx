@@ -1,47 +1,81 @@
 import { useEffect, useState } from "react";
 import { useSettings } from "../settings/SettingsContext";
-import { Button } from "../components/ui";
+import { Button, SettingCard, SettingRow, Toggle } from "../components/ui";
 import { api, type Server } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
 
 type Tab = "display" | "backup" | "editor";
 
+const TABS: {
+  key: Tab;
+  label: string;
+  desc: string;
+  icon: string;
+  adminOnly?: boolean;
+}[] = [
+  { key: "display", label: "显示设置", desc: "界面字号与字体", icon: "🎨" },
+  {
+    key: "backup",
+    label: "备份设置",
+    desc: "中心备份保留策略",
+    icon: "🗄️",
+    adminOnly: true,
+  },
+  {
+    key: "editor",
+    label: "编辑开关",
+    desc: "各节点 Agent 策略",
+    icon: "🛡️",
+    adminOnly: true,
+  },
+];
+
 export default function Settings() {
   const { user } = useAuth();
   const isAdmin = user?.role === "admin";
   const [tab, setTab] = useState<Tab>("display");
-
-  const tabs: { key: Tab; label: string; adminOnly?: boolean }[] = [
-    { key: "display", label: "显示设置" },
-    { key: "backup", label: "备份设置", adminOnly: true },
-    { key: "editor", label: "编辑开关", adminOnly: true },
-  ];
+  const tabs = TABS.filter((t) => !t.adminOnly || isAdmin);
 
   return (
     <div className="p-6">
-      <h1 className="mb-4 text-xl font-semibold text-slate-800">设置</h1>
+      <h1 className="mb-1 text-xl font-semibold text-slate-800">设置</h1>
+      <p className="mb-6 text-sm text-slate-500">
+        管理界面外观、备份策略与各节点的 Agent 编辑权限。
+      </p>
+
       <div className="flex gap-6">
-        {/* 左侧子导航 */}
-        <nav className="w-40 shrink-0 space-y-1">
-          {tabs
-            .filter((t) => !t.adminOnly || isAdmin)
-            .map((t) => (
+        {/* 左侧子导航：图标 + 标题 + 描述 */}
+        <nav className="w-52 shrink-0 space-y-1">
+          {tabs.map((t) => {
+            const active = tab === t.key;
+            return (
               <button
                 key={t.key}
                 onClick={() => setTab(t.key)}
-                className={`block w-full rounded-md px-3 py-2 text-left text-sm ${
-                  tab === t.key
-                    ? "bg-brand-50 font-medium text-brand-700"
-                    : "text-slate-600 hover:bg-slate-100"
+                className={`flex w-full items-start gap-3 rounded-lg border px-3 py-2.5 text-left transition ${
+                  active
+                    ? "border-brand-200 bg-brand-50"
+                    : "border-transparent hover:bg-slate-100"
                 }`}
               >
-                {t.label}
+                <span className="text-lg leading-none">{t.icon}</span>
+                <span className="min-w-0">
+                  <span
+                    className={`block text-sm font-medium ${
+                      active ? "text-brand-700" : "text-slate-700"
+                    }`}
+                  >
+                    {t.label}
+                  </span>
+                  <span className="block text-xs text-slate-400">{t.desc}</span>
+                </span>
               </button>
-            ))}
+            );
+          })}
         </nav>
 
         {/* 右侧内容 */}
-        <div className="max-w-2xl flex-1">
+        <div className="max-w-2xl flex-1 space-y-5">
           {tab === "display" && <DisplaySettings />}
           {tab === "backup" && isAdmin && <BackupSettings />}
           {tab === "editor" && isAdmin && <EditorToggle />}
@@ -51,37 +85,64 @@ export default function Settings() {
   );
 }
 
-/* ---------------- 显示设置（外观偏好，存浏览器） ---------------- */
+/* ---------- 小工具：保存反馈条 ---------- */
+function Feedback({ msg, err }: { msg?: string; err?: string }) {
+  if (!msg && !err) return null;
+  return (
+    <div
+      className={`rounded-md px-3 py-2 text-sm ${
+        err
+          ? "bg-red-50 text-red-700"
+          : "bg-green-50 text-green-700"
+      }`}
+    >
+      {err || msg}
+    </div>
+  );
+}
+
+/* ---------------- 显示设置 ---------------- */
 function DisplaySettings() {
   const { prefs, setPrefs, reset } = useSettings();
+  const fonts = [
+    { v: "system", label: "系统默认" },
+    { v: "serif", label: "衬线" },
+    { v: "mono", label: "等宽" },
+  ] as const;
+
   return (
-    <section>
-      <p className="mb-4 text-sm text-slate-500">
-        调整界面字号、字体。设置即时生效并保存在本浏览器。
-      </p>
-      <div className="space-y-6 rounded-lg border border-slate-200 bg-white p-6">
-        <div>
-          <div className="flex items-center justify-between">
-            <label className="text-sm font-medium text-slate-700">
-              界面字号缩放
-            </label>
-            <span className="text-sm text-slate-500">{prefs.uiScale}%</span>
+    <>
+      <SettingCard
+        title="界面外观"
+        desc="即时生效，仅保存在当前浏览器。"
+      >
+        <SettingRow
+          label="界面字号缩放"
+          desc="整体放大或缩小界面文字与控件"
+        >
+          <div className="flex items-center gap-3">
+            <input
+              type="range"
+              min={80}
+              max={160}
+              step={5}
+              value={prefs.uiScale}
+              onChange={(e) => setPrefs({ uiScale: Number(e.target.value) })}
+              className="w-40 accent-brand-600"
+            />
+            <span className="w-12 text-right text-sm tabular-nums text-slate-600">
+              {prefs.uiScale}%
+            </span>
           </div>
-          <input
-            type="range"
-            min={80}
-            max={160}
-            step={5}
-            value={prefs.uiScale}
-            onChange={(e) => setPrefs({ uiScale: Number(e.target.value) })}
-            className="mt-2 w-full"
-          />
-          <div className="mt-2 flex gap-2">
+        </SettingRow>
+
+        <SettingRow label="快捷缩放">
+          <div className="flex gap-2">
             {[90, 100, 115, 130].map((v) => (
               <button
                 key={v}
                 onClick={() => setPrefs({ uiScale: v })}
-                className={`rounded border px-2 py-1 text-xs ${
+                className={`rounded-md border px-2.5 py-1 text-xs transition ${
                   prefs.uiScale === v
                     ? "border-brand-500 bg-brand-50 text-brand-700"
                     : "border-slate-300 text-slate-600 hover:bg-slate-50"
@@ -91,22 +152,15 @@ function DisplaySettings() {
               </button>
             ))}
           </div>
-        </div>
+        </SettingRow>
 
-        <div>
-          <label className="text-sm font-medium text-slate-700">界面字体</label>
-          <div className="mt-2 flex gap-2">
-            {(
-              [
-                { v: "system", label: "系统默认" },
-                { v: "serif", label: "衬线" },
-                { v: "mono", label: "等宽" },
-              ] as const
-            ).map((o) => (
+        <SettingRow label="界面字体">
+          <div className="flex gap-2">
+            {fonts.map((o) => (
               <button
                 key={o.v}
                 onClick={() => setPrefs({ fontFamily: o.v })}
-                className={`rounded border px-3 py-1.5 text-sm ${
+                className={`rounded-md border px-3 py-1.5 text-sm transition ${
                   prefs.fontFamily === o.v
                     ? "border-brand-500 bg-brand-50 text-brand-700"
                     : "border-slate-300 text-slate-600 hover:bg-slate-50"
@@ -116,43 +170,58 @@ function DisplaySettings() {
               </button>
             ))}
           </div>
-        </div>
+        </SettingRow>
+      </SettingCard>
 
-        <div>
-          <div className="flex items-center justify-between">
-            <label className="text-sm font-medium text-slate-700">
-              源码编辑器字号
-            </label>
-            <span className="text-sm text-slate-500">
+      <SettingCard title="源码编辑器" desc="配置文件源码模式的显示效果。">
+        <SettingRow label="编辑器字号">
+          <div className="flex items-center gap-3">
+            <input
+              type="range"
+              min={11}
+              max={22}
+              step={1}
+              value={prefs.editorFontSize}
+              onChange={(e) =>
+                setPrefs({ editorFontSize: Number(e.target.value) })
+              }
+              className="w-40 accent-brand-600"
+            />
+            <span className="w-12 text-right text-sm tabular-nums text-slate-600">
               {prefs.editorFontSize}px
             </span>
           </div>
-          <input
-            type="range"
-            min={11}
-            max={22}
-            step={1}
-            value={prefs.editorFontSize}
-            onChange={(e) =>
-              setPrefs({ editorFontSize: Number(e.target.value) })
-            }
-            className="mt-2 w-full"
-          />
+        </SettingRow>
+        <div className="px-5 py-4">
+          <div className="mb-1.5 text-xs text-slate-400">实时预览</div>
+          <pre
+            className="code overflow-x-auto rounded-md border border-slate-200 bg-slate-50 p-3 text-slate-700"
+            style={{ fontSize: prefs.editorFontSize }}
+          >
+{`server {
+    listen 80;
+    server_name example.com;
+    location / {
+        proxy_pass http://backend;
+    }
+}`}
+          </pre>
         </div>
+      </SettingCard>
 
-        <div className="flex justify-end border-t border-slate-100 pt-4">
-          <Button variant="secondary" onClick={reset}>
-            恢复默认
-          </Button>
-        </div>
+      <div className="flex justify-end">
+        <Button variant="secondary" onClick={reset}>
+          恢复默认
+        </Button>
       </div>
-    </section>
+    </>
   );
 }
 
-/* ---------------- 备份设置（中心全局，存数据库） ---------------- */
+/* ---------------- 备份设置 ---------------- */
 function BackupSettings() {
-  const [retain, setRetain] = useState<number>(5);
+  const [retain, setRetain] = useState(5);
+  const [initial, setInitial] = useState(5);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState("");
@@ -161,10 +230,15 @@ function BackupSettings() {
   useEffect(() => {
     api
       .getSettings()
-      .then((r) => setRetain(r.retain_per_file))
+      .then((r) => {
+        setRetain(r.retain_per_file);
+        setInitial(r.retain_per_file);
+      })
       .catch((e) => setErr((e as Error).message))
       .finally(() => setLoading(false));
   }, []);
+
+  const dirty = retain !== initial;
 
   const save = async () => {
     setSaving(true);
@@ -173,6 +247,7 @@ function BackupSettings() {
     try {
       const r = await api.updateSettings(retain);
       setRetain(r.retain_per_file);
+      setInitial(r.retain_per_file);
       setMsg("已保存");
     } catch (e) {
       setErr((e as Error).message);
@@ -184,31 +259,36 @@ function BackupSettings() {
   if (loading) return <p className="text-slate-400">加载中...</p>;
 
   return (
-    <section>
-      <p className="mb-4 text-sm text-slate-500">
-        中心侧备份策略。写入配置时，中心会保留每个配置文件的最近 N 份内容副本（容灾）。
-      </p>
-      <div className="space-y-4 rounded-lg border border-slate-200 bg-white p-6">
-        <label className="block text-sm font-medium text-slate-700">
-          中心每文件保留份数
-          <input
-            type="number"
-            min={1}
-            max={100}
-            className="mt-1 w-32 rounded-md border border-slate-300 px-3 py-2 text-sm"
-            value={retain}
-            onChange={(e) => setRetain(Number(e.target.value))}
-          />
-        </label>
-        {msg && <p className="text-sm text-green-600">{msg}</p>}
-        {err && <p className="text-sm text-red-600">{err}</p>}
-        <div className="flex justify-end border-t border-slate-100 pt-4">
-          <Button onClick={save} disabled={saving}>
-            {saving ? "保存中..." : "保存"}
-          </Button>
-        </div>
+    <>
+      <SettingCard
+        title="中心备份策略"
+        desc="写入配置时，中心会保留每个配置文件的最近 N 份内容副本，用于容灾与回滚。"
+      >
+        <SettingRow
+          label="每文件保留份数"
+          desc="超过份数的旧副本会被自动清理"
+        >
+          <div className="flex items-center gap-2">
+            <input
+              type="number"
+              min={1}
+              max={100}
+              className="w-24 rounded-md border border-slate-300 px-3 py-1.5 text-sm"
+              value={retain}
+              onChange={(e) => setRetain(Number(e.target.value))}
+            />
+            <span className="text-sm text-slate-400">份</span>
+          </div>
+        </SettingRow>
+      </SettingCard>
+
+      <Feedback msg={msg} err={err} />
+      <div className="flex justify-end">
+        <Button onClick={save} disabled={saving || !dirty}>
+          {saving ? "保存中..." : "保存"}
+        </Button>
       </div>
-    </section>
+    </>
   );
 }
 
@@ -219,6 +299,7 @@ function EditorToggle() {
   const [retain, setRetain] = useState(50);
   const [allowMain, setAllowMain] = useState(false);
   const [remoteAllowed, setRemoteAllowed] = useState(false);
+  const [snapshot, setSnapshot] = useState({ retain: 50, allowMain: false });
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState("");
@@ -234,7 +315,6 @@ function EditorToggle() {
       .catch((e) => setErr((e as Error).message));
   }, []);
 
-  // 选中服务器后拉取其 Agent 设置
   useEffect(() => {
     if (!serverId) return;
     setLoading(true);
@@ -246,10 +326,13 @@ function EditorToggle() {
         setRetain(r.backup_retain);
         setAllowMain(r.allow_main_config);
         setRemoteAllowed(r.allow_main_config_remote);
+        setSnapshot({ retain: r.backup_retain, allowMain: r.allow_main_config });
       })
       .catch((e) => setErr("无法读取该 Agent 设置：" + (e as Error).message))
       .finally(() => setLoading(false));
   }, [serverId]);
+
+  const dirty = retain !== snapshot.retain || allowMain !== snapshot.allowMain;
 
   const save = async () => {
     setSaving(true);
@@ -260,6 +343,7 @@ function EditorToggle() {
       setRetain(r.backup_retain);
       setAllowMain(r.allow_main_config);
       setRemoteAllowed(r.allow_main_config_remote);
+      setSnapshot({ retain: r.backup_retain, allowMain: r.allow_main_config });
       setMsg("已下发到 Agent 并持久化");
     } catch (e) {
       setErr((e as Error).message);
@@ -269,71 +353,90 @@ function EditorToggle() {
   };
 
   return (
-    <section>
-      <p className="mb-4 text-sm text-slate-500">
-        每台 Agent 的本地策略：快照保留份数、是否允许编辑主配置。修改会实时下发到对应 Agent 并持久化。
-      </p>
-      <div className="space-y-4 rounded-lg border border-slate-200 bg-white p-6">
-        <label className="block text-sm font-medium text-slate-700">
-          选择服务器
+    <>
+      <SettingCard
+        title="目标节点"
+        desc="选择要配置的服务器，设置将实时下发到对应 Agent。"
+      >
+        <SettingRow label="服务器">
           <select
-            className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+            className="w-72 rounded-md border border-slate-300 px-3 py-1.5 text-sm"
             value={serverId}
             onChange={(e) => setServerId(e.target.value)}
           >
+            {servers.length === 0 && <option value="">（暂无服务器）</option>}
             {servers.map((s) => (
               <option key={s.id} value={s.id}>
                 {s.name}（{s.address}）
               </option>
             ))}
           </select>
-        </label>
+        </SettingRow>
+      </SettingCard>
 
-        {loading ? (
-          <p className="text-slate-400">读取 Agent 设置中...</p>
-        ) : (
-          <>
-            <label className="block text-sm font-medium text-slate-700">
-              Agent 本地快照保留份数
-              <input
-                type="number"
-                min={1}
-                max={500}
-                className="mt-1 w-32 rounded-md border border-slate-300 px-3 py-2 text-sm"
-                value={retain}
-                onChange={(e) => setRetain(Number(e.target.value))}
-              />
-            </label>
-
-            <div className="rounded-md border border-amber-200 bg-amber-50/50 p-3">
-              <label className="flex items-center gap-2 text-sm font-medium text-amber-800">
+      {loading ? (
+        <p className="text-slate-400">读取 Agent 设置中...</p>
+      ) : serverId ? (
+        <>
+          <SettingCard title="Agent 本地策略">
+            <SettingRow
+              label="本地快照保留份数"
+              desc="该节点本地保留的配置快照数量"
+            >
+              <div className="flex items-center gap-2">
                 <input
-                  type="checkbox"
-                  checked={allowMain}
-                  disabled={!remoteAllowed}
-                  onChange={(e) => setAllowMain(e.target.checked)}
+                  type="number"
+                  min={1}
+                  max={500}
+                  className="w-24 rounded-md border border-slate-300 px-3 py-1.5 text-sm"
+                  value={retain}
+                  onChange={(e) => setRetain(Number(e.target.value))}
                 />
-                允许编辑主配置 nginx.conf（高危）
-              </label>
-              {!remoteAllowed && (
-                <p className="mt-1 text-xs text-amber-700">
-                  该 Agent 未开启远程总闸（config.yaml 的{" "}
-                  <code>allow_main_config_remote: true</code>），
-                  出于安全无法在此远程开启。如确需开启，请在该机器本地修改后重启 Agent。
-                </p>
-              )}
-            </div>
-          </>
-        )}
+                <span className="text-sm text-slate-400">份</span>
+              </div>
+            </SettingRow>
 
-        {msg && <p className="text-sm text-green-600">{msg}</p>}
-        {err && <p className="text-sm text-red-600">{err}</p>}
-        <div className="flex justify-end border-t border-slate-100 pt-4">
-          <Button onClick={save} disabled={saving || loading || !serverId}>
-            {saving ? "下发中..." : "保存并下发"}
-          </Button>
-        </div>
-      </div>
-    </section>
+            <SettingRow
+              label="允许编辑主配置 nginx.conf"
+              desc={
+                remoteAllowed
+                  ? "高危：开启后可在画布/源码中改写主配置"
+                  : "该节点未开启远程总闸，无法在此远程开启"
+              }
+            >
+              <Toggle
+                checked={allowMain}
+                disabled={!remoteAllowed}
+                onChange={setAllowMain}
+              />
+            </SettingRow>
+          </SettingCard>
+
+          {/* 高危提示卡 */}
+          {!remoteAllowed && (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800">
+              <div className="font-medium">主配置编辑开关被本地总闸锁定</div>
+              <p className="mt-1 leading-relaxed">
+                出于安全，远程修改主配置编辑权限默认禁用。如确需开启，请在该机器
+                的 <code className="rounded bg-amber-100 px-1">config.yaml</code> 中设置{" "}
+                <code className="rounded bg-amber-100 px-1">
+                  nginx.allow_main_config_remote: true
+                </code>{" "}
+                后重启 Agent。
+              </p>
+            </div>
+          )}
+
+          <Feedback msg={msg} err={err} />
+          <div className="flex justify-end">
+            <Button onClick={save} disabled={saving || !dirty}>
+              {saving ? "下发中..." : "保存并下发"}
+            </Button>
+          </div>
+        </>
+      ) : (
+        <p className="text-slate-400">请先在「服务列表」中添加服务器。</p>
+      )}
+    </>
   );
 }

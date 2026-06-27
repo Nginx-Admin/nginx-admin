@@ -9,7 +9,7 @@ http:
 
 database:
   # PostgreSQL 连接串
-  dsn: "host=10.80.128.6 port=5432 user=nginx_admin password=nginx_admin dbname=nginx_admin sslmode=disable TimeZone=Asia/Shanghai"
+  dsn: "host=10.226.14.167 port=5432 user=nginx_admin password=nginx_admin dbname=nginx_admin sslmode=disable TimeZone=Asia/Shanghai"
 
 auth:
   jwt_secret: "please-change-this-to-a-long-random-secret"
