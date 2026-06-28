@@ -58,7 +58,7 @@ function toFlow(
       type: "blockNode",
       position: { x: topX, y: -170 },
       data: {
-        kind: b.kind === "events" ? "events" : "http",
+        kind: b.kind, // "http" | "events" | "other"，节点组件据此区分配色
         title: b.title,
         subtitle:
           b.kind === "http"

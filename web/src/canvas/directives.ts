@@ -219,25 +219,36 @@ export function buildFlowModel(dirs: Directive[]): FlowModel {
   const structureBlocks: FlowModel["structureBlocks"] = [];
   const globals: FlowModel["globals"] = [];
 
-  // 顶层（根）扫描：识别 http/events 结构块与全局指令
+  // 顶层（根）扫描：识别结构块与全局指令
   dirs.forEach((d, i) => {
     if (isComment(d)) return;
     if (isBlock(d)) {
-      if (d.directive === "http" || d.directive === "events") {
-        const block = d.block || [];
-        const directiveCount = block.filter(
-          (c) => !isBlock(c) && !isComment(c)
-        ).length;
-        structureBlocks.push({
-          path: [i],
-          node: d,
-          kind: d.directive,
-          title: d.directive,
-          childCount: block.length,
-          directiveCount,
-        });
-      }
-      // server/upstream 顶层块由下面的 walk 统一收集
+      // server/upstream 顶层块由下面的 walk 统一收集，这里跳过
+      if (d.directive === "server" || d.directive === "upstream") return;
+
+      // 其余所有顶层块都作为结构块展示：http/events 用专属 kind，
+      // 其它（types/map/geo/stream 等，如 mime.types 的 types 块）归为 other。
+      const block = d.block || [];
+      const directiveCount = block.filter(
+        (c) => !isBlock(c) && !isComment(c)
+      ).length;
+      const kind: "http" | "events" | "other" =
+        d.directive === "http" || d.directive === "events"
+          ? d.directive
+          : "other";
+      // 块标题：http/events 直接用块名；带参数的块（如 location、map $x $y）带上参数
+      const title =
+        d.args && d.args.length
+          ? `${d.directive} ${d.args.join(" ")}`
+          : d.directive;
+      structureBlocks.push({
+        path: [i],
+        node: d,
+        kind,
+        title,
+        childCount: block.length,
+        directiveCount,
+      });
     } else {
       // 顶层简单指令 = 全局指令
       const text =
