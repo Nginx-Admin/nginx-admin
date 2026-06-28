@@ -58,14 +58,14 @@ function DirectiveList({
             >
               <div className="flex items-center gap-1">
                 <input
-                  className="w-40 shrink-0 rounded border border-slate-300 px-1.5 py-1 text-xs font-medium"
+                  className="min-w-0 flex-[2] rounded border border-slate-300 px-1.5 py-1 text-xs font-medium"
                   value={child.directive}
                   onChange={(e) =>
                     onChange(updateDirectiveName(dirs, childPath, e.target.value))
                   }
                 />
                 <input
-                  className="code flex-1 rounded border border-slate-300 px-1.5 py-1 text-xs"
+                  className="code min-w-0 flex-[3] rounded border border-slate-300 px-1.5 py-1 text-xs"
                   value={child.args.join(" ")}
                   placeholder="参数"
                   onChange={(e) =>
@@ -100,14 +100,14 @@ function DirectiveList({
         return (
           <div key={i} className="flex items-center gap-1">
             <input
-              className="w-40 shrink-0 rounded border border-slate-300 px-1.5 py-1 text-xs font-medium"
+              className="min-w-0 flex-[2] rounded border border-slate-300 px-1.5 py-1 text-xs font-medium"
               value={child.directive}
               onChange={(e) =>
                 onChange(updateDirectiveName(dirs, childPath, e.target.value))
               }
             />
             <input
-              className="code flex-1 rounded border border-slate-300 px-1.5 py-1 text-xs"
+              className="code min-w-0 flex-[3] rounded border border-slate-300 px-1.5 py-1 text-xs"
               value={child.args.join(" ")}
               placeholder="参数"
               onChange={(e) =>
@@ -175,14 +175,14 @@ export default function PropertyPanel({ dirs, selectedPath, onChange }: Props) {
             return (
               <div key={i} className="flex items-center gap-1">
                 <input
-                  className="w-40 shrink-0 rounded border border-slate-300 px-1.5 py-1 text-xs font-medium"
+                  className="min-w-0 flex-[2] rounded border border-slate-300 px-1.5 py-1 text-xs font-medium"
                   value={d.directive}
                   onChange={(e) =>
                     onChange(updateDirectiveName(dirs, path, e.target.value))
                   }
                 />
                 <input
-                  className="code flex-1 rounded border border-slate-300 px-1.5 py-1 text-xs"
+                  className="code min-w-0 flex-[3] rounded border border-slate-300 px-1.5 py-1 text-xs"
                   value={d.args.join(" ")}
                   placeholder="参数"
                   onChange={(e) =>
