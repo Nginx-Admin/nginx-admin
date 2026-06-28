@@ -34,6 +34,10 @@ export default function ConfigEditor() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState("");
+  // 保存的分阶段结果（nginx -t / reload），分别展示
+  const [stages, setStages] = useState<
+    { label: string; ok: boolean; detail?: string }[] | null
+  >(null);
   const [err, setErr] = useState("");
 
   // 全局 upstream 名单（跨文件，供画布连线指向外部文件定义的 upstream）
@@ -127,6 +131,7 @@ export default function ConfigEditor() {
     setSaving(true);
     setMsg("");
     setErr("");
+    setStages(null);
     try {
       // 画布模式：先把指令树 build 成文本
       let content = source;
@@ -136,12 +141,29 @@ export default function ConfigEditor() {
       }
       const r = await api.writeConfig(id, path, content, checksum);
       if (r.ok) {
-        setMsg("保存成功：已通过 nginx -t 校验并 reload。");
+        // 成功：两个阶段都通过（安全闭环保证 nginx -t 通过才会 reload）
+        setStages([
+          { label: "nginx -t 校验通过", ok: true },
+          { label: "reload 成功，配置已生效", ok: true },
+        ]);
         if (r.new_checksum) setChecksum(r.new_checksum);
-        // 同步源码视图
-        setSource(content);
+        setSource(content); // 同步源码视图
       } else {
-        setErr("保存失败（已自动回滚）：\n" + (r.error || ""));
+        // 失败：根据错误信息判断卡在哪一步
+        const errText = r.error || "";
+        const reloadFailed = /reload/i.test(errText);
+        if (reloadFailed) {
+          // nginx -t 过了但 reload 失败
+          setStages([
+            { label: "nginx -t 校验通过", ok: true },
+            { label: "reload 失败（已自动回滚）", ok: false, detail: errText },
+          ]);
+        } else {
+          // nginx -t 未通过
+          setStages([
+            { label: "nginx -t 校验失败（已自动回滚）", ok: false, detail: errText },
+          ]);
+        }
       }
     } catch (e) {
       setErr((e as Error).message);
@@ -196,6 +218,33 @@ export default function ConfigEditor() {
           )}
         </div>
       </div>
+
+      {/* 保存的分阶段结果：nginx -t / reload 分两步展示 */}
+      {stages && (
+        <div className="m-3 space-y-1 rounded-md border border-slate-200 bg-white p-3">
+          {stages.map((s, i) => (
+            <div key={i}>
+              <div className="flex items-center gap-2 text-sm">
+                <span
+                  className={`flex h-5 w-5 items-center justify-center rounded-full text-xs text-white ${
+                    s.ok ? "bg-green-500" : "bg-red-500"
+                  }`}
+                >
+                  {s.ok ? "✓" : "✕"}
+                </span>
+                <span className={s.ok ? "text-slate-700" : "text-red-700"}>
+                  第 {i + 1} 步 · {s.label}
+                </span>
+              </div>
+              {s.detail && (
+                <pre className="code mt-1 ml-7 whitespace-pre-wrap rounded bg-red-50 p-2 text-xs text-red-700">
+                  {s.detail}
+                </pre>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
 
       {(msg || err) && (
         <pre
