@@ -208,7 +208,7 @@ export default function ConfigEditor() {
       )}
 
       {/* 主体 */}
-      <div className="flex flex-1 overflow-hidden">
+      <div className="relative flex flex-1 overflow-hidden">
         {mode === "canvas" ? (
           <>
             <div className="flex-1">
@@ -224,15 +224,31 @@ export default function ConfigEditor() {
                 </ReactFlowProvider>
               )}
             </div>
-            <div className="w-80 overflow-auto border-l border-slate-200 bg-white">
-              {dirs && (
-                <PropertyPanel
-                  dirs={dirs}
-                  selectedPath={selectedPath}
-                  onChange={setDirs}
-                />
-              )}
-            </div>
+
+            {/* 属性面板：浮层抽屉，盖在画布上层，不压缩画布宽度 */}
+            {dirs && selectedPath && (
+              <div className="absolute right-0 top-0 z-10 flex h-full w-[420px] max-w-[90%] flex-col border-l border-slate-200 bg-white shadow-xl">
+                <div className="flex items-center justify-between border-b border-slate-100 px-4 py-2">
+                  <span className="text-sm font-medium text-slate-700">
+                    属性编辑
+                  </span>
+                  <button
+                    onClick={() => setSelectedPath(null)}
+                    className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+                    title="关闭"
+                  >
+                    ✕
+                  </button>
+                </div>
+                <div className="flex-1 overflow-auto">
+                  <PropertyPanel
+                    dirs={dirs}
+                    selectedPath={selectedPath}
+                    onChange={setDirs}
+                  />
+                </div>
+              </div>
+            )}
           </>
         ) : (
           <textarea
