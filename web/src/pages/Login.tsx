@@ -31,7 +31,7 @@ export default function Login() {
         onSubmit={submit}
         className="w-full max-w-sm rounded-xl bg-white p-8 shadow-sm border border-slate-200"
       >
-        <h1 className="text-xl font-semibold text-slate-800">nginx-admin</h1>
+        <h1 className="text-xl font-semibold text-slate-800">Nginx Admin</h1>
         <p className="mt-1 text-sm text-slate-500">Nginx 可视化管理控制台</p>
 
         <label className="mt-6 block text-sm font-medium text-slate-700">

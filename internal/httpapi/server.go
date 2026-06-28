@@ -64,9 +64,9 @@ func (s *Server) Router() *gin.Engine {
 
 			// 配置
 			authed.GET("/servers/:id/configs", s.handleListConfigs)
-			authed.GET("/servers/:id/upstreams", s.handleListUpstreams) // 全局 upstream 汇总（跨文件）
+			authed.GET("/servers/:id/upstreams", s.handleListUpstreams)    // 全局 upstream 汇总（跨文件）
 			authed.GET("/servers/:id/upstream-refs", s.handleUpstreamRefs) // upstream 反向引用（谁用了）
-			authed.GET("/servers/:id/config", s.handleReadConfig) // ?path=
+			authed.GET("/servers/:id/config", s.handleReadConfig)          // ?path=
 			authed.PUT("/servers/:id/config", s.RequireRole("editor"), s.handleWriteConfig)
 			authed.POST("/servers/:id/test", s.RequireRole("editor"), s.handleTest)
 			authed.POST("/servers/:id/reload", s.RequireRole("editor"), s.handleReload)
@@ -131,7 +131,7 @@ const placeholderHTML = `<!doctype html><html lang="zh"><head><meta charset="utf
 <title>nginx-admin</title><meta name="viewport" content="width=device-width,initial-scale=1">
 <style>body{font-family:system-ui,sans-serif;max-width:680px;margin:60px auto;padding:0 20px;color:#222}
 code{background:#f4f4f5;padding:2px 6px;border-radius:4px}h1{font-size:22px}</style></head>
-<body><h1>nginx-admin 控制台</h1>
+<body><h1>Nginx Admin</h1>
 <p>后端已启动。前端静态资源尚未嵌入（<code>web/dist</code> 为空时显示此占位页）。</p>
 <p>API 健康检查：<code>GET /api/health</code>；登录：<code>POST /api/auth/login</code>。</p>
 </body></html>`

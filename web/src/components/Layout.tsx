@@ -15,7 +15,7 @@ export default function Layout() {
     <div className="flex h-full">
       <aside className="flex w-56 flex-col border-r border-slate-200 bg-white">
         <div className="px-5 py-4 border-b border-slate-100">
-          <div className="text-lg font-semibold text-slate-800">nginx-admin</div>
+          <div className="text-lg font-semibold text-slate-800">Nginx Admin</div>
           <div className="text-xs text-slate-400">控制台</div>
         </div>
         <nav className="flex-1 px-3 py-4 space-y-1">
