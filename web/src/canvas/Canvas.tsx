@@ -232,6 +232,23 @@ function toFlow(
       },
     });
 
+    // http → server 从属连线：若该 server 位于某结构块（http）内部，
+    // 即 server.path 以该结构块 path 为前缀，则连一条线表示包含关系。
+    const parentBlock = model.structureBlocks.find(
+      (b) =>
+        b.path.length < s.path.length &&
+        b.path.every((v, idx) => v === s.path[idx])
+    );
+    if (parentBlock) {
+      edges.push({
+        id: `${nid(parentBlock.path)}->${sId}`,
+        source: nid(parentBlock.path),
+        target: sId,
+        type: "smoothstep",
+        style: { stroke: "#94a3b8" },
+      });
+    }
+
     s.locations.forEach((loc, li) => {
       const locId = nid(loc.path);
       nodes.push({
