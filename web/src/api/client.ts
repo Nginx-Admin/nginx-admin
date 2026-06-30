@@ -19,6 +19,27 @@ export interface Server {
   created_at: string;
 }
 
+export interface ServerExportItem {
+  name: string;
+  address: string;
+  labels: string;
+}
+
+export interface ServerExportBundle {
+  format: string;
+  version: number;
+  exported_at: string;
+  servers: ServerExportItem[];
+}
+
+export interface ServerImportResult {
+  created: number;
+  updated: number;
+  skipped: number;
+  failed: number;
+  errors: string[];
+}
+
 export interface ServerStatus {
   nginx_running: boolean;
   nginx_version: string;
@@ -180,6 +201,18 @@ export const api = {
     request<Server>("PUT", `/servers/${id}`, { name, address, labels }),
   deleteServer: (id: string) =>
     request<{ ok: boolean }>("DELETE", `/servers/${id}`),
+  exportServer: (id: string) =>
+    request<ServerExportBundle>("GET", `/servers/${id}/export`),
+  exportServers: (ids?: string[]) =>
+    request<ServerExportBundle>("POST", "/servers/export", { ids: ids ?? [] }),
+  importServers: (
+    bundle: ServerExportBundle,
+    on_conflict: "skip" | "update" = "skip"
+  ) =>
+    request<ServerImportResult>("POST", "/servers/import", {
+      ...bundle,
+      on_conflict,
+    }),
   serverStatus: (id: string) =>
     request<ServerStatus>("GET", `/servers/${id}/status`),
   serverStatusCached: (id: string) =>

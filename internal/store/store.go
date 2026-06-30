@@ -114,6 +114,24 @@ func (s *Store) GetServer(id string) (*model.Server, error) {
 	return &srv, err
 }
 
+func (s *Store) GetServerByAddress(address string) (*model.Server, error) {
+	var srv model.Server
+	err := s.db.Where("address = ?", address).First(&srv).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil
+	}
+	return &srv, err
+}
+
+func (s *Store) ListServersByIDs(ids []string) ([]model.Server, error) {
+	if len(ids) == 0 {
+		return s.ListServers()
+	}
+	var rows []model.Server
+	err := s.db.Where("id IN ?", ids).Order("created_at desc").Find(&rows).Error
+	return rows, err
+}
+
 func (s *Store) CreateServer(srv *model.Server) error {
 	if srv.ID == "" {
 		srv.ID = uuid.NewString()

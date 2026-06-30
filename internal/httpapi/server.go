@@ -58,7 +58,10 @@ func (s *Server) Router() *gin.Engine {
 			// 服务器（Agent）管理
 			authed.GET("/servers", s.handleListServers)
 			authed.POST("/servers/test-connection", s.RequireRole("admin"), s.handleTestConnection)
+			authed.POST("/servers/export", s.RequireRole("admin"), s.handleExportServers)
+			authed.POST("/servers/import", s.RequireRole("admin"), s.handleImportServers)
 			authed.POST("/servers", s.RequireRole("admin"), s.handleCreateServer)
+			authed.GET("/servers/:id/export", s.RequireRole("admin"), s.handleExportServer)
 			authed.GET("/servers/:id", s.handleGetServer)
 			authed.PUT("/servers/:id", s.RequireRole("admin"), s.handleUpdateServer)
 			authed.DELETE("/servers/:id", s.RequireRole("admin"), s.handleDeleteServer)
