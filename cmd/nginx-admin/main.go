@@ -35,7 +35,7 @@ func main() {
 		log.Fatalf("加载配置失败: %v", err)
 	}
 
-	st, err := store.Open(cfg.Database.DSN, cfg.Backup.RetainPerFile)
+	st, err := store.Open(cfg.Database.DSN)
 	if err != nil {
 		log.Fatalf("初始化数据库失败: %v", err)
 	}

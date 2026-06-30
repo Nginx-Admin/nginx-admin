@@ -3,7 +3,6 @@ package store
 import (
 	"errors"
 	"fmt"
-	"strconv"
 	"time"
 
 	"github.com/google/uuid"
@@ -17,12 +16,11 @@ import (
 
 // Store 封装数据库访问。
 type Store struct {
-	db            *gorm.DB
-	retainPerFile int
+	db *gorm.DB
 }
 
 // Open 连接 PostgreSQL 并执行自动迁移。
-func Open(dsn string, retainPerFile int) (*Store, error) {
+func Open(dsn string) (*Store, error) {
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
 		Logger: logger.Default.LogMode(logger.Warn),
 		// 跳过默认事务包裹，减少远程库的额外往返（BEGIN/COMMIT）。
@@ -46,7 +44,7 @@ func Open(dsn string, retainPerFile int) (*Store, error) {
 	if err := model.AutoMigrate(db); err != nil {
 		return nil, fmt.Errorf("数据库迁移失败: %w", err)
 	}
-	return &Store{db: db, retainPerFile: retainPerFile}, nil
+	return &Store{db: db}, nil
 }
 
 // DB 返回底层 *gorm.DB（供高级查询）。
@@ -207,90 +205,6 @@ func (s *Store) BatchUpsertConfigFiles(serverID string, files map[string]string)
 		Columns:   []clause.Column{{Name: "server_id"}, {Name: "logical_path"}},
 		DoUpdates: clause.AssignmentColumns([]string{"checksum", "updated_at"}),
 	}).Create(&rows).Error
-}
-
-// ---------- Backup（含中心副本 + 保留份数） ----------
-
-// SaveBackup 保存一份中心侧副本，并按 retainPerFile 裁剪旧副本。
-func (s *Store) SaveBackup(b *model.Backup) error {
-	if b.ID == "" {
-		b.ID = uuid.NewString()
-	}
-	if b.CreatedAt.IsZero() {
-		b.CreatedAt = time.Now()
-	}
-	if err := s.db.Create(b).Error; err != nil {
-		return err
-	}
-	return s.pruneBackups(b.ServerID, b.LogicalPath)
-}
-
-// pruneBackups 保留 (server, logicalPath) 最近 N 份。N 取自设置（可页面修改），
-// 兜底用初始化时的 retainPerFile。
-func (s *Store) pruneBackups(serverID, logicalPath string) error {
-	keep := s.RetainPerFile()
-	var ids []string
-	err := s.db.Model(&model.Backup{}).
-		Where("server_id = ? AND logical_path = ?", serverID, logicalPath).
-		Order("created_at desc").
-		Offset(keep).
-		Pluck("id", &ids).Error
-	if err != nil {
-		return err
-	}
-	if len(ids) == 0 {
-		return nil
-	}
-	return s.db.Delete(&model.Backup{}, "id IN ?", ids).Error
-}
-
-// ---------- 设置（AppSetting） ----------
-
-// GetSetting 读取设置值，不存在返回空字符串。
-func (s *Store) GetSetting(key string) (string, error) {
-	var row model.AppSetting
-	err := s.db.First(&row, "key = ?", key).Error
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return "", nil
-	}
-	return row.Value, err
-}
-
-// SetSetting 写入/更新设置值。
-func (s *Store) SetSetting(key, value string) error {
-	return s.db.Clauses(clause.OnConflict{
-		Columns:   []clause.Column{{Name: "key"}},
-		DoUpdates: clause.AssignmentColumns([]string{"value", "updated_at"}),
-	}).Create(&model.AppSetting{Key: key, Value: value, UpdatedAt: time.Now()}).Error
-}
-
-// RetainPerFile 返回中心备份保留份数：优先读设置，无效则用初始化兜底值。
-func (s *Store) RetainPerFile() int {
-	if v, err := s.GetSetting(model.SettingRetainPerFile); err == nil && v != "" {
-		if n, err := strconv.Atoi(v); err == nil && n > 0 {
-			return n
-		}
-	}
-	return s.retainPerFile
-}
-
-func (s *Store) ListBackups(serverID, logicalPath string) ([]model.Backup, error) {
-	var rows []model.Backup
-	q := s.db.Where("server_id = ?", serverID)
-	if logicalPath != "" {
-		q = q.Where("logical_path = ?", logicalPath)
-	}
-	err := q.Order("created_at desc").Find(&rows).Error
-	return rows, err
-}
-
-func (s *Store) GetBackup(id string) (*model.Backup, error) {
-	var b model.Backup
-	err := s.db.First(&b, "id = ?", id).Error
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, nil
-	}
-	return &b, err
 }
 
 // ---------- Audit ----------

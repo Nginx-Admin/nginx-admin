@@ -1,5 +1,4 @@
-import { useEffect, useState } from "react";
-import { useAuth } from "../auth/AuthContext";
+import { useState } from "react";
 import { api } from "../api/client";
 import { useSettings } from "../settings/SettingsContext";
 import { Button, SettingCard, SettingRow } from "../components/ui";
@@ -11,7 +10,6 @@ export default function Settings() {
       <p className="mb-6 text-sm text-slate-500">账号、外观与系统偏好。</p>
       <div className="max-w-2xl space-y-5">
         <PasswordSettings />
-        <AdminSettings />
         <DisplaySettings />
       </div>
     </div>
@@ -92,64 +90,6 @@ function PasswordSettings() {
           {busy ? "保存中…" : "更新密码"}
         </Button>
       </form>
-    </SettingCard>
-  );
-}
-
-function AdminSettings() {
-  const { user } = useAuth();
-  const [retain, setRetain] = useState(5);
-  const [msg, setMsg] = useState("");
-  const [err, setErr] = useState("");
-  const [busy, setBusy] = useState(false);
-
-  useEffect(() => {
-    if (user?.role !== "admin") return;
-    api
-      .getSettings()
-      .then((r) => setRetain(r.retain_per_file))
-      .catch(() => {});
-  }, [user?.role]);
-
-  if (user?.role !== "admin") return null;
-
-  const save = async () => {
-    setBusy(true);
-    setMsg("");
-    setErr("");
-    try {
-      const r = await api.updateSettings(retain);
-      setRetain(r.retain_per_file);
-      setMsg("已保存（中心数据库备份保留策略，Agent 本地快照由 Agent 端 config 控制）");
-    } catch (e) {
-      setErr((e as Error).message);
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <SettingCard
-      title="备份策略（中心）"
-      desc="中心数据库层每文件保留份数（当前写入流程以 Agent 本地快照为主，此值为预留策略）。"
-    >
-      <SettingRow label="每文件保留份数" desc="1 ~ 1000">
-        <div className="flex items-center gap-2">
-          <input
-            type="number"
-            min={1}
-            max={1000}
-            className="w-24 rounded-md border border-slate-300 px-2 py-1 text-sm"
-            value={retain}
-            onChange={(e) => setRetain(Number(e.target.value))}
-          />
-          <Button variant="secondary" onClick={save} disabled={busy}>
-            保存
-          </Button>
-        </div>
-      </SettingRow>
-      {msg && <p className="px-5 pb-3 text-sm text-green-600">{msg}</p>}
-      {err && <p className="px-5 pb-3 text-sm text-red-600">{err}</p>}
     </SettingCard>
   );
 }

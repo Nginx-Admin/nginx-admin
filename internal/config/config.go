@@ -13,7 +13,6 @@ type Config struct {
 	Database DatabaseConfig `yaml:"database"`
 	Auth     AuthConfig     `yaml:"auth"`
 	Agent    AgentConfig    `yaml:"agent"`
-	Backup   BackupConfig   `yaml:"backup"`
 }
 
 type HTTPConfig struct {
@@ -51,11 +50,6 @@ type AgentConfig struct {
 	DialTimeoutSeconds int `yaml:"dial_timeout_seconds"`
 }
 
-type BackupConfig struct {
-	// 中心侧每个配置文件保留的副本份数（已定：5）。
-	RetainPerFile int `yaml:"retain_per_file"`
-}
-
 func Default() Config {
 	return Config{
 		HTTP: HTTPConfig{Listen: "0.0.0.0:8080"},
@@ -67,7 +61,6 @@ func Default() Config {
 			DefaultAdminPassword: "admin",
 		},
 		Agent:  AgentConfig{TLSEnabled: false, DialTimeoutSeconds: 15},
-		Backup: BackupConfig{RetainPerFile: 5},
 	}
 }
 
@@ -95,9 +88,6 @@ func (c Config) Validate() error {
 	}
 	if c.Auth.JWTSecret == "" {
 		return fmt.Errorf("auth.jwt_secret 不能为空")
-	}
-	if c.Backup.RetainPerFile <= 0 {
-		return fmt.Errorf("backup.retain_per_file 必须大于 0")
 	}
 	return nil
 }

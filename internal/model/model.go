@@ -52,21 +52,6 @@ type ConfigFile struct {
 	UpdatedAt   time.Time `json:"updated_at"`
 }
 
-// Backup 备份/版本索引 + 中心侧内容副本。
-// 已定策略：中心保留每个配置文件最近 RetainPerFile（5）份内容副本。
-type Backup struct {
-	ID           string    `gorm:"primaryKey;type:uuid" json:"id"`
-	ServerID     string    `gorm:"index;not null;type:uuid" json:"server_id"`
-	ConfigFileID string    `gorm:"index;type:uuid" json:"config_file_id"`
-	LogicalPath  string    `gorm:"index;not null" json:"logical_path"`
-	SnapshotRef  string    `json:"snapshot_ref"`        // Agent 本地快照引用
-	Content      []byte    `gorm:"type:bytea" json:"-"` // 中心侧内容副本（容灾）
-	Checksum     string    `json:"checksum"`
-	CreatedBy    string    `gorm:"type:uuid" json:"created_by"`
-	Note         string    `json:"note"`
-	CreatedAt    time.Time `json:"created_at"`
-}
-
 // AuditLog 操作审计（仅追加）。
 type AuditLog struct {
 	ID        uint64    `gorm:"primaryKey;autoIncrement" json:"id"`
@@ -88,23 +73,10 @@ type LoginAttempt struct {
 	AttemptAt time.Time `gorm:"index" json:"attempt_at"`
 }
 
-// AppSetting 是中心控制台的全局设置（key-value），可在页面修改、即时生效。
-type AppSetting struct {
-	Key       string    `gorm:"primaryKey" json:"key"`
-	Value     string    `json:"value"`
-	UpdatedAt time.Time `json:"updated_at"`
-}
-
-// 设置项 key 常量。
-const (
-	SettingRetainPerFile = "backup.retain_per_file" // 中心备份每文件保留份数
-)
-
 // AllModels 返回所有需迁移的模型。
 func AllModels() []any {
 	return []any{
-		&User{}, &Server{}, &ConfigFile{}, &Backup{}, &AuditLog{}, &LoginAttempt{},
-		&AppSetting{},
+		&User{}, &Server{}, &ConfigFile{}, &AuditLog{}, &LoginAttempt{},
 	}
 }
 

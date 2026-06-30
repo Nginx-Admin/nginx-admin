@@ -166,13 +166,6 @@ export const api = {
   deleteUser: (id: string) =>
     request<{ ok: boolean }>("DELETE", `/users/${id}`),
 
-  getSettings: () =>
-    request<{ retain_per_file: number }>("GET", "/settings"),
-  updateSettings: (retain_per_file: number) =>
-    request<{ retain_per_file: number }>("PUT", "/settings", {
-      retain_per_file,
-    }),
-
   listServers: () => request<{ servers: Server[] }>("GET", "/servers"),
   testConnection: (address: string) =>
     request<{ ok: boolean; agent_version?: string; error?: string }>(

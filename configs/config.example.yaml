@@ -24,9 +24,3 @@ agent:
   # key:  /etc/nginx-admin/tls/admin.key
   # ca:   /etc/nginx-admin/tls/ca.crt
   dial_timeout_seconds: 15
-
-backup:
-  # 中心侧每个配置文件保留最近 N 份副本。
-  # 注意：此值仅作为「数据库未设置过」时的初始默认值；
-  # 实际运行值请在 Web 控制台「设置 → 备份设置」中修改（持久化到数据库）。
-  retain_per_file: 5
