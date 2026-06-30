@@ -137,25 +137,3 @@ func (s *Server) handleDeleteUser(c *gin.Context) {
 	s.audit(claims.UserID, "", "user.delete", u.Username, "success", "")
 	c.JSON(http.StatusOK, gin.H{"ok": true})
 }
-
-type testConnectionReq struct {
-	Address string `json:"address" binding:"required"`
-}
-
-// handleTestConnection 测试 Agent 地址是否可达（纳管前预检）。
-func (s *Server) handleTestConnection(c *gin.Context) {
-	var req testConnectionReq
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "请提供 address (host:port)"})
-		return
-	}
-	rep, err := s.agents.Ping(c.Request.Context(), req.Address)
-	if err != nil {
-		c.JSON(http.StatusOK, gin.H{"ok": false, "error": err.Error()})
-		return
-	}
-	c.JSON(http.StatusOK, gin.H{
-		"ok":            true,
-		"agent_version": rep.GetAgentVersion(),
-	})
-}

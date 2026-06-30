@@ -13,13 +13,15 @@ web/
 ├── dist/
 └── src/
     ├── main.tsx
+    ├── app/routes.tsx      # Hash 路由
     ├── index.css
     ├── api/client.ts
     ├── auth/AuthContext.tsx
-    ├── settings/SettingsContext.tsx  # 浅色/深色主题
+    ├── settings/SettingsContext.tsx
     ├── components/         # Layout、SourceEditor、DiffView、ui
     ├── pages/              # Login / Servers / ServerDetail / ConfigEditor / Audit / Users / Settings
-    ├── utils/diff.ts       # 行级 diff
+    ├── utils/diff.ts
+    ├── types/              # 第三方类型补充
     └── canvas/
         ├── directives.ts   # crossplane 指令树辅助
         ├── matcher.ts      # 流量模拟（location 匹配）

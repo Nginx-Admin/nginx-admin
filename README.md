@@ -67,15 +67,37 @@ nginx-admin/
 │   ├── bootstrap/                # 首次启动创建默认 admin
 │   ├── nginxconf/                # crossplane 解析/回写
 │   └── httpapi/                  # Gin HTTP 服务
+│       ├── server.go             # 路由注册 + 前端挂载
+│       ├── middleware.go
+│       ├── helpers.go
+│       ├── handlers_auth.go
+│       ├── handlers_users.go
+│       ├── handlers_settings.go
+│       ├── handlers_servers.go
+│       ├── handlers_upstreams.go
+│       ├── handlers_agent_config.go
+│       ├── handlers_backups.go
+│       ├── handlers_audit.go
+│       ├── handlers_nginx_parse.go
+│       └── version.go
 ├── web/                          # 前端（React 18 + TypeScript + Vite + Tailwind）
-│   ├── src/                      # pages / canvas / api / auth / components
+│   ├── src/
+│   │   ├── app/routes.tsx        # 路由定义
+│   │   ├── pages/                # 页面
+│   │   ├── canvas/               # 配置画布
+│   │   ├── components/           # 通用组件
+│   │   ├── api/                  # REST 客户端
+│   │   ├── auth/ / settings/     # Context
+│   │   └── utils/
 │   ├── dist/                     # 构建产物（go:embed 内嵌）
 │   └── embed.go
+├── configs/
+│   └── config.example.yaml       # 配置示例
 ├── deploy/
 │   ├── nginx-admin.service
 │   ├── install.sh
 │   └── README.md
-├── config.yaml
+├── config.yaml                   # 本地开发配置
 └── Makefile
 ```
 
@@ -91,8 +113,12 @@ nginx-admin/
 # 1) 构建前端（产物输出到 web/dist，供 Go 内嵌）
 cd web && npm install && npm run build && cd ..
 
-# 2) 编译后端
-go build -o nginx-admin ./cmd/nginx-admin
+# 2) 编译（含前端 embed）
+make build
+
+# 或分步：
+# cd web && npm install && npm run build && cd ..
+# go build -o nginx-admin ./cmd/nginx-admin
 
 # 3) 准备 PostgreSQL，填好 config.yaml 的 database.dsn
 

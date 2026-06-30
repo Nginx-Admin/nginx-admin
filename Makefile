@@ -1,7 +1,12 @@
 # nginx-admin Makefile
 BINARY := nginx-admin
+VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
+LDFLAGS := -s -w -X nginx-admin/internal/httpapi.Version=$(VERSION)
+CONFIG ?= ./config.yaml
 
-.PHONY: proto build run vet tidy clean frontend
+.PHONY: all proto frontend build run vet tidy clean linux-amd64 linux-arm64
+
+all: frontend build
 
 # 重新生成 protobuf 代码（需要 protoc + protoc-gen-go + protoc-gen-go-grpc）
 proto:
@@ -10,15 +15,14 @@ proto:
 		--go-grpc_out=internal/pb --go-grpc_opt=paths=source_relative \
 		api/proto/agent.proto
 
-# 构建前端（前端工程就绪后启用）：将产物输出到 web/dist
 frontend:
 	cd web && npm install && npm run build
 
-build:
-	go build -o bin/$(BINARY) ./cmd/nginx-admin
+build: frontend
+	go build -ldflags "$(LDFLAGS)" -o bin/$(BINARY) ./cmd/nginx-admin
 
 run:
-	go run ./cmd/nginx-admin -config ./config.yaml
+	go run -ldflags "$(LDFLAGS)" ./cmd/nginx-admin -config $(CONFIG)
 
 vet:
 	go vet ./...
@@ -28,3 +32,9 @@ tidy:
 
 clean:
 	rm -rf bin
+
+linux-amd64: frontend
+	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags "$(LDFLAGS)" -o bin/$(BINARY)-linux-amd64 ./cmd/nginx-admin
+
+linux-arm64: frontend
+	CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -ldflags "$(LDFLAGS)" -o bin/$(BINARY)-linux-arm64 ./cmd/nginx-admin

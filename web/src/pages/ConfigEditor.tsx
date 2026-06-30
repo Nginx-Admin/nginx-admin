@@ -36,6 +36,8 @@ export default function ConfigEditor() {
   const [mode, setMode] = useState<Mode>("canvas");
   const [source, setSource] = useState("");
   const [baseline, setBaseline] = useState("");
+  /** 画布是否被用户编辑过（parse/build 往返不算） */
+  const [canvasTouched, setCanvasTouched] = useState(false);
   const [dirs, setDirs] = useState<Directive[] | null>(null);
   const [checksum, setChecksum] = useState("");
   const [selectedPath, setSelectedPath] = useState<NodePath | null>(null);
@@ -93,6 +95,7 @@ export default function ConfigEditor() {
   const load = useCallback(async () => {
     setLoading(true);
     setErr("");
+    setCanvasTouched(false);
     try {
       const r = await api.readConfig(id, path);
       setSource(r.content);
@@ -113,6 +116,11 @@ export default function ConfigEditor() {
       setLoading(false);
     }
   }, [id, path, mode]);
+
+  const updateDirs = useCallback((next: Directive[]) => {
+    setCanvasTouched(true);
+    setDirs(next);
+  }, []);
 
   const loadBackups = useCallback(async () => {
     setBackupLoading(true);
@@ -136,8 +144,8 @@ export default function ConfigEditor() {
 
   const dirty = useMemo(() => {
     if (mode === "source") return source !== baseline;
-    return false; // 画布 dirty 在打开 diff 时异步计算
-  }, [mode, source, baseline]);
+    return canvasTouched;
+  }, [mode, source, baseline, canvasTouched]);
 
   useEffect(() => {
     const onBeforeUnload = (e: BeforeUnloadEvent) => {
@@ -173,7 +181,8 @@ export default function ConfigEditor() {
 
   const switchToSource = async () => {
     setErr("");
-    if (dirs) {
+    // 仅画布有真实编辑时才 rebuild；否则保留磁盘原文，避免 crossplane 往返产生假 diff
+    if (dirs && canvasTouched) {
       try {
         const r = await api.buildConfig(dirs);
         setSource(r.content);
@@ -192,6 +201,7 @@ export default function ConfigEditor() {
       setDirs(p.directives);
       setSelectedPath(null);
       setMatchedPath(null);
+      setCanvasTouched(source !== baseline);
       setMode("canvas");
     } catch (e) {
       setErr("配置解析失败：" + (e as Error).message);
@@ -226,6 +236,10 @@ export default function ConfigEditor() {
   };
 
   const openDiff = async () => {
+    if (!dirty) {
+      setMsg("相对上次加载无变更");
+      return;
+    }
     const cur = await resolveContent();
     if (!hasDiff(baseline, cur)) {
       setMsg("相对上次加载无变更");
@@ -256,6 +270,7 @@ export default function ConfigEditor() {
         if (r.new_checksum) setChecksum(r.new_checksum);
         setSource(content);
         setBaseline(content);
+        setCanvasTouched(false);
         setShowDiff(false);
       } else {
         const errText = r.error || "";
@@ -462,14 +477,14 @@ export default function ConfigEditor() {
                 <button
                   type="button"
                   className="rounded-md border border-slate-300 bg-white px-2 py-1 text-xs shadow-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
-                  onClick={() => setDirs(appendChild(dirs, [], templateServerBlock()))}
+                  onClick={() => updateDirs(appendChild(dirs, [], templateServerBlock()))}
                 >
                   + Server
                 </button>
                 <button
                   type="button"
                   className="rounded-md border border-slate-300 bg-white px-2 py-1 text-xs shadow-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
-                  onClick={() => setDirs(appendChild(dirs, [], templateUpstreamBlock()))}
+                  onClick={() => updateDirs(appendChild(dirs, [], templateUpstreamBlock()))}
                 >
                   + Upstream
                 </button>
@@ -498,7 +513,7 @@ export default function ConfigEditor() {
                   </button>
                 </div>
                 <div className="flex-1 overflow-auto">
-                  <PropertyPanel dirs={dirs} selectedPath={selectedPath} onChange={setDirs} />
+                  <PropertyPanel dirs={dirs} selectedPath={selectedPath} onChange={updateDirs} />
                 </div>
               </div>
             )}

@@ -13,9 +13,6 @@ import (
 	"nginx-admin/internal/store"
 )
 
-// Version 是 admin 版本号。
-var Version = "0.1.0-dev"
-
 // Server 是 HTTP API 服务器。
 type Server struct {
 	cfg    config.Config
