@@ -1,4 +1,5 @@
 import { NavLink, Outlet, useLocation } from "react-router-dom";
+import { useAuth } from "../auth/AuthContext";
 
 const sections = [
   {
@@ -19,11 +20,22 @@ const sections = [
     label: "源码编辑器",
     desc: "配置编辑显示",
   },
+  {
+    id: "migration",
+    to: "/settings/migration",
+    label: "服务迁移",
+    desc: "YAML 导入导出",
+    adminOnly: true,
+  },
 ] as const;
 
 export default function SettingsLayout() {
   const { pathname } = useLocation();
-  const active = sections.find((s) => pathname.endsWith(s.id)) ?? sections[0];
+  const { user } = useAuth();
+  const visible = sections.filter(
+    (s) => !("adminOnly" in s && s.adminOnly) || user?.role === "admin"
+  );
+  const active = visible.find((s) => pathname.endsWith(s.id)) ?? visible[0];
 
   return (
     <div className="flex h-full min-h-0 flex-col p-6">
@@ -41,7 +53,7 @@ export default function SettingsLayout() {
           className="w-52 shrink-0 space-y-1"
           aria-label="设置分类"
         >
-          {sections.map((s) => (
+          {visible.map((s) => (
             <NavLink
               key={s.id}
               to={s.to}
@@ -76,7 +88,7 @@ export default function SettingsLayout() {
               {active.desc}
             </p>
           </div>
-          <div className="max-w-2xl">
+          <div className="max-w-3xl">
             <Outlet />
           </div>
         </div>

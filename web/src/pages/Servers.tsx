@@ -2,9 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api, type Server } from "../api/client";
 import { Button, statusBadge } from "../components/ui";
-import ServerMigrationModal from "../components/ServerMigrationModal";
 import { useAuth } from "../auth/AuthContext";
-import { downloadServerBundle } from "../utils/serverExport";
 
 const UNGROUPED = "未分组";
 
@@ -43,8 +41,6 @@ export default function Servers() {
   const [editing, setEditing] = useState<Server | null>(null);
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const [refreshingAll, setRefreshingAll] = useState(false);
-  const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [showMigration, setShowMigration] = useState(false);
 
   const load = () => {
     setLoading(true);
@@ -87,25 +83,6 @@ export default function Servers() {
   const toggle = (name: string) =>
     setCollapsed((c) => ({ ...c, [name]: !c[name] }));
 
-  const toggleSelect = (id: string) => {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
-
-  const allSelected =
-    servers.length > 0 && servers.every((s) => selected.has(s.id));
-
-  const toggleSelectAll = () => {
-    if (allSelected) setSelected(new Set());
-    else setSelected(new Set(servers.map((s) => s.id)));
-  };
-
-  const clearSelection = () => setSelected(new Set());
-
   const refreshAllStatus = async () => {
     if (servers.length === 0) return;
     setRefreshingAll(true);
@@ -135,40 +112,10 @@ export default function Servers() {
             </Button>
           )}
           {isAdmin && (
-            <Button variant="secondary" onClick={() => setShowMigration(true)}>
-              迁移
-            </Button>
-          )}
-          {isAdmin && (
             <Button onClick={() => setShowCreate(true)}>+ 新增服务</Button>
           )}
         </div>
       </div>
-
-      {isAdmin && selected.size > 0 && (
-        <div className="mb-4 flex items-center justify-between rounded-lg border border-brand-200 bg-brand-50/80 px-4 py-2 text-sm dark:border-brand-900 dark:bg-brand-950/40">
-          <span className="text-brand-800 dark:text-brand-200">
-            已选择 <strong>{selected.size}</strong> 项
-          </span>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setShowMigration(true)}
-              className="font-medium text-brand-700 hover:underline dark:text-brand-300"
-            >
-              迁移导出
-            </button>
-            <span className="text-brand-300">|</span>
-            <button
-              type="button"
-              onClick={clearSelection}
-              className="text-slate-600 hover:underline dark:text-slate-400"
-            >
-              取消选择
-            </button>
-          </div>
-        </div>
-      )}
 
       {err && <p className="mb-3 text-sm text-red-600">{err}</p>}
       {loading ? (
@@ -184,7 +131,6 @@ export default function Servers() {
               key={g.name}
               className="overflow-hidden rounded-lg border border-slate-200 bg-white"
             >
-              {/* 分组头 */}
               <button
                 onClick={() => toggle(g.name)}
                 className="flex w-full items-center gap-2 border-b border-slate-100 bg-slate-50 px-4 py-2 text-left hover:bg-slate-100"
@@ -205,21 +151,10 @@ export default function Servers() {
                 </span>
               </button>
 
-              {/* 分组内服务表 */}
               {!collapsed[g.name] && (
                 <table className="w-full text-sm">
                   <thead className="text-left text-slate-500">
                     <tr>
-                      {isAdmin && (
-                        <th className="w-10 px-2 py-2">
-                          <input
-                            type="checkbox"
-                            checked={allSelected}
-                            onChange={toggleSelectAll}
-                            aria-label="全选"
-                          />
-                        </th>
-                      )}
                       <th className="px-4 py-2 font-medium">名称</th>
                       <th className="px-4 py-2 font-medium">地址</th>
                       <th className="px-4 py-2 font-medium">状态</th>
@@ -230,16 +165,6 @@ export default function Servers() {
                   <tbody className="divide-y divide-slate-100">
                     {g.items.map((s) => (
                       <tr key={s.id} className="hover:bg-slate-50">
-                        {isAdmin && (
-                          <td className="px-2 py-2">
-                            <input
-                              type="checkbox"
-                              checked={selected.has(s.id)}
-                              onChange={() => toggleSelect(s.id)}
-                              aria-label={`选择 ${s.name}`}
-                            />
-                          </td>
-                        )}
                         <td className="px-4 py-2 font-medium text-slate-800">
                           {s.name}
                         </td>
@@ -289,19 +214,6 @@ export default function Servers() {
           onSaved={() => {
             setShowCreate(false);
             setEditing(null);
-            load();
-          }}
-        />
-      )}
-
-      {showMigration && (
-        <ServerMigrationModal
-          servers={servers}
-          selectedIds={selected}
-          onClose={() => setShowMigration(false)}
-          onImported={() => {
-            setShowMigration(false);
-            setSelected(new Set());
             load();
           }}
         />
@@ -394,23 +306,6 @@ function ServerModal({
     }
   };
 
-  const doExport = async () => {
-    if (!server) return;
-    setBusy(true);
-    setErr("");
-    try {
-      const bundle = await api.exportServer(server.id);
-      downloadServerBundle(
-        bundle,
-        `nginx-admin-server-${server.name.replace(/[^\w.-]+/g, "_")}.json`
-      );
-    } catch (e) {
-      setErr((e as Error).message);
-    } finally {
-      setBusy(false);
-    }
-  };
-
   return (
     <div className="fixed inset-0 z-10 flex items-center justify-center bg-black/30 p-4">
       <form
@@ -472,24 +367,14 @@ function ServerModal({
         {err && <p className="mt-3 text-sm text-red-600">{err}</p>}
         <div className="mt-5 flex flex-wrap items-center gap-2">
           {isEdit && (
-            <>
-              <button
-                type="button"
-                onClick={doExport}
-                disabled={busy}
-                className="text-sm text-slate-500 hover:text-slate-800 hover:underline disabled:opacity-50"
-              >
-                导出此服务 JSON
-              </button>
-              <Button
-                type="button"
-                variant="danger"
-                onClick={doDelete}
-                disabled={busy}
-              >
-                删除服务
-              </Button>
-            </>
+            <Button
+              type="button"
+              variant="danger"
+              onClick={doDelete}
+              disabled={busy}
+            >
+              删除服务
+            </Button>
           )}
           <div className="ml-auto flex gap-2">
             <button
@@ -509,7 +394,6 @@ function ServerModal({
   );
 }
 
-// 解析 labels 原始 JSON 取分组（空则返回 ""，用于表单初值）。
 function groupOfRaw(labels: string): string {
   try {
     const obj = JSON.parse(labels || "{}");

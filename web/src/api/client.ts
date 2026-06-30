@@ -22,7 +22,7 @@ export interface Server {
 export interface ServerExportItem {
   name: string;
   address: string;
-  labels: string;
+  labels?: Record<string, unknown> | string;
 }
 
 export interface ServerExportBundle {
@@ -164,6 +164,48 @@ async function request<T>(
   return data as T;
 }
 
+async function requestText(
+  method: string,
+  path: string,
+  body?: unknown,
+  contentType = "application/json"
+): Promise<string> {
+  const headers: Record<string, string> = {};
+  const token = getToken();
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+  if (body !== undefined) headers["Content-Type"] = contentType;
+
+  const resp = await fetch(`/api${path}`, {
+    method,
+    headers,
+    body:
+      body !== undefined
+        ? contentType === "application/json"
+          ? JSON.stringify(body)
+          : String(body)
+        : undefined,
+  });
+
+  if (resp.status === 401) {
+    clearToken();
+    if (!path.startsWith("/auth/login")) {
+      window.location.hash = "#/login";
+    }
+  }
+
+  const text = await resp.text();
+  if (!resp.ok) {
+    let msg = text;
+    try {
+      msg = (JSON.parse(text) as { error?: string }).error || text;
+    } catch {
+      // keep raw text
+    }
+    throw new ApiError(resp.status, msg || `请求失败 (${resp.status})`);
+  }
+  return text;
+}
+
 export const api = {
   login: (username: string, password: string) =>
     request<{ token: string; user: User }>("POST", "/auth/login", {
@@ -202,17 +244,13 @@ export const api = {
   deleteServer: (id: string) =>
     request<{ ok: boolean }>("DELETE", `/servers/${id}`),
   exportServer: (id: string) =>
-    request<ServerExportBundle>("GET", `/servers/${id}/export`),
+    requestText("GET", `/servers/${id}/export`),
   exportServers: (ids?: string[]) =>
-    request<ServerExportBundle>("POST", "/servers/export", { ids: ids ?? [] }),
-  importServers: (
-    bundle: ServerExportBundle,
-    on_conflict: "skip" | "update" = "skip"
-  ) =>
-    request<ServerImportResult>("POST", "/servers/import", {
-      ...bundle,
-      on_conflict,
-    }),
+    requestText("POST", "/servers/export", { ids: ids ?? [] }),
+  importServers: (yamlText: string) =>
+    requestText("POST", "/servers/import", yamlText, "application/yaml").then(
+      (t) => JSON.parse(t) as ServerImportResult
+    ),
   serverStatus: (id: string) =>
     request<ServerStatus>("GET", `/servers/${id}/status`),
   serverStatusCached: (id: string) =>

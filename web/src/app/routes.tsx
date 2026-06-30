@@ -10,6 +10,7 @@ import SettingsLayout from "../settings/SettingsLayout";
 import AccountPanel from "../settings/panels/AccountPanel";
 import AppearancePanel from "../settings/panels/AppearancePanel";
 import EditorPanel from "../settings/panels/EditorPanel";
+import MigrationPanel from "../settings/panels/MigrationPanel";
 import Users from "../pages/Users";
 
 function Protected({ children }: { children: React.ReactNode }) {
@@ -48,6 +49,7 @@ export const router = createHashRouter([
           { path: "account", element: <AccountPanel /> },
           { path: "appearance", element: <AppearancePanel /> },
           { path: "editor", element: <EditorPanel /> },
+          { path: "migration", element: <MigrationPanel /> },
         ],
       },
     ],

@@ -3,12 +3,14 @@ package httpapi
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"gopkg.in/yaml.v3"
 
 	"nginx-admin/internal/model"
 )
@@ -17,27 +19,21 @@ const serverExportFormat = "nginx-admin-servers"
 const serverExportVersion = 1
 
 type serverExportItem struct {
-	Name    string `json:"name"`
-	Address string `json:"address"`
-	Labels  string `json:"labels"`
+	Name    string `yaml:"name" json:"name"`
+	Address string `yaml:"address" json:"address"`
+	Labels  any    `yaml:"labels,omitempty" json:"labels,omitempty"`
 }
 
 type serverExportBundle struct {
-	Format     string             `json:"format"`
-	Version    int                `json:"version"`
-	ExportedAt string             `json:"exported_at"`
-	Servers    []serverExportItem `json:"servers"`
+	Format     string             `yaml:"format" json:"format"`
+	Version    int                `yaml:"version" json:"version"`
+	ExportedAt string             `yaml:"exported_at" json:"exported_at"`
+	OnConflict string             `yaml:"on_conflict,omitempty" json:"on_conflict,omitempty"`
+	Servers    []serverExportItem `yaml:"servers" json:"servers"`
 }
 
 type exportServersReq struct {
 	IDs []string `json:"ids"`
-}
-
-type importServersReq struct {
-	Format     string             `json:"format"`
-	Version    int                `json:"version"`
-	Servers    []serverExportItem `json:"servers"`
-	OnConflict string             `json:"on_conflict"` // skip | update
 }
 
 type importServersResp struct {
@@ -48,16 +44,27 @@ type importServersResp struct {
 	Errors  []string `json:"errors"`
 }
 
-func toExportItem(s model.Server) serverExportItem {
-	labels := strings.TrimSpace(s.Labels)
-	if labels == "" {
-		labels = "{}"
+func labelsToMap(raw string) map[string]any {
+	s := strings.TrimSpace(raw)
+	if s == "" || s == "{}" {
+		return nil
 	}
-	return serverExportItem{
+	var obj map[string]any
+	if err := json.Unmarshal([]byte(s), &obj); err != nil || len(obj) == 0 {
+		return nil
+	}
+	return obj
+}
+
+func toExportItem(s model.Server) serverExportItem {
+	item := serverExportItem{
 		Name:    s.Name,
 		Address: s.Address,
-		Labels:  labels,
 	}
+	if labels := labelsToMap(s.Labels); labels != nil {
+		item.Labels = labels
+	}
+	return item
 }
 
 func buildExportBundle(rows []model.Server) serverExportBundle {
@@ -73,13 +80,22 @@ func buildExportBundle(rows []model.Server) serverExportBundle {
 	}
 }
 
-// handleExportServer 导出单个服务（迁移用 JSON）。
+func writeExportYAML(c *gin.Context, bundle serverExportBundle) {
+	data, err := yaml.Marshal(bundle)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.Data(http.StatusOK, "application/yaml; charset=utf-8", data)
+}
+
+// handleExportServer 导出单个服务（迁移用 YAML）。
 func (s *Server) handleExportServer(c *gin.Context) {
 	srv := s.mustServer(c)
 	if srv == nil {
 		return
 	}
-	c.JSON(http.StatusOK, buildExportBundle([]model.Server{*srv}))
+	writeExportYAML(c, buildExportBundle([]model.Server{*srv}))
 }
 
 // handleExportServers 批量导出；body.ids 为空则导出全部。
@@ -94,16 +110,29 @@ func (s *Server) handleExportServers(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, buildExportBundle(rows))
+	writeExportYAML(c, buildExportBundle(rows))
 }
 
-// handleImportServers 批量导入服务定义（name/address/labels）。
+// handleImportServers 批量导入服务定义（YAML 或 JSON）。
 func (s *Server) handleImportServers(c *gin.Context) {
-	var req importServersReq
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "参数错误"})
+	body, err := io.ReadAll(c.Request.Body)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "无法读取请求体"})
 		return
 	}
+	if len(body) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "请求体不能为空"})
+		return
+	}
+
+	var req serverExportBundle
+	if err := yaml.Unmarshal(body, &req); err != nil {
+		if err := json.Unmarshal(body, &req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "无法解析 YAML/JSON 格式"})
+			return
+		}
+	}
+
 	if req.Format != "" && req.Format != serverExportFormat {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "不支持的导出格式: " + req.Format})
 		return
@@ -141,7 +170,7 @@ func (s *Server) handleImportServers(c *gin.Context) {
 			resp.Errors = append(resp.Errors, formatImportErr(i, "地址格式无效，需 host:port"))
 			continue
 		}
-		labels, err := normalizeLabels(item.Labels)
+		labels, err := itemLabelsJSON(item.Labels)
 		if err != nil {
 			resp.Failed++
 			resp.Errors = append(resp.Errors, formatImportErr(i, err.Error()))
@@ -182,6 +211,40 @@ func (s *Server) handleImportServers(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, resp)
+}
+
+func itemLabelsJSON(v any) (string, error) {
+	if v == nil {
+		return "{}", nil
+	}
+	switch t := v.(type) {
+	case string:
+		return normalizeLabels(t)
+	case map[string]any:
+		if len(t) == 0 {
+			return "{}", nil
+		}
+		b, err := json.Marshal(t)
+		if err != nil {
+			return "", err
+		}
+		return string(b), nil
+	case map[any]any:
+		m := make(map[string]any, len(t))
+		for k, val := range t {
+			m[fmt.Sprint(k)] = val
+		}
+		if len(m) == 0 {
+			return "{}", nil
+		}
+		b, err := json.Marshal(m)
+		if err != nil {
+			return "", err
+		}
+		return string(b), nil
+	default:
+		return "", fmt.Errorf("labels 格式无效")
+	}
 }
 
 func formatImportErr(index int, msg string) string {

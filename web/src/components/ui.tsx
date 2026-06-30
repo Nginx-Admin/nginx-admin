@@ -57,9 +57,6 @@ export function statusBadge(status: string) {
   }
 }
 
-/* ---------- 设置页通用组件 ---------- */
-
-// Toggle 专业开关。
 export function Toggle({
   checked,
   onChange,
@@ -86,6 +83,55 @@ export function Toggle({
         }`}
       />
     </button>
+  );
+}
+
+// CheckBox 自定义勾选框，用于列表多选。
+export function CheckBox({
+  checked,
+  onChange,
+  disabled,
+  label,
+  className = "",
+}: {
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  disabled?: boolean;
+  label?: string;
+  className?: string;
+}) {
+  return (
+    <label
+      className={`inline-flex cursor-pointer items-center gap-2 ${disabled ? "cursor-not-allowed opacity-50" : ""} ${className}`}
+    >
+      <button
+        type="button"
+        role="checkbox"
+        aria-checked={checked}
+        disabled={disabled}
+        onClick={() => !disabled && onChange(!checked)}
+        className={`flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-md border-2 transition ${
+          checked
+            ? "border-brand-600 bg-brand-600 text-white shadow-sm"
+            : "border-slate-300 bg-white hover:border-brand-400 dark:border-slate-600 dark:bg-slate-900"
+        }`}
+      >
+        {checked && (
+          <svg viewBox="0 0 12 12" className="h-3 w-3" fill="none" aria-hidden>
+            <path
+              d="M2.5 6.2 4.8 8.5 9.5 3.5"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        )}
+      </button>
+      {label && (
+        <span className="text-sm text-slate-700 dark:text-slate-200">{label}</span>
+      )}
+    </label>
   );
 }
 
