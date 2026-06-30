@@ -16,6 +16,7 @@ web/
     ├── index.css
     ├── api/client.ts
     ├── auth/AuthContext.tsx
+    ├── settings/SettingsContext.tsx  # 浅色/深色主题
     ├── components/         # Layout、SourceEditor、DiffView、ui
     ├── pages/              # Login / Servers / ServerDetail / ConfigEditor / Audit / Users / Settings
     ├── utils/diff.ts       # 行级 diff
@@ -43,8 +44,9 @@ npm run build
 - **流量模拟**：Host + URI → 匹配 location，画布高亮
 - **变更对比**：相对上次加载的行级 diff
 - **快照/回滚**：Agent 本地备份
-- **删除配置**：详情页子配置「删除」（需 Agent 支持 `DeleteConfig`）
-- **主题**：设置页切换浅色/深色
+- **删除配置**：详情页子配置「删除」（需 Agent v0.5.0+ 的 `DeleteConfig`）
+- **未保存提示**：编辑器有脏数据时离开页面二次确认
+- **主题**：设置页切换浅色/深色（`SettingsContext` + localStorage）
 
 ## 页面路由
 

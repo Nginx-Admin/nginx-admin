@@ -55,4 +55,5 @@ systemctl restart nginx-admin
 journalctl -u nginx-admin -f
 ```
 
-> 升级：重新构建二进制，重复步骤 2-3。`install.sh` 不会覆盖已存在的 `config.yaml`。
+> 升级：重新构建二进制，重复步骤 2-3。`install.sh` 不会覆盖已存在的 `config.yaml`。  
+> 若使用「删除子配置」，需同步升级各台 nginx-agent 至 **v0.5.0+**。
