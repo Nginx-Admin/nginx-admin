@@ -13,12 +13,17 @@ function escapeHtml(s: string): string {
     .replace(/>/g, "&gt;");
 }
 
+/** 占位符：不可含裸数字，否则会被 NUMBERS 正则误匹配 */
+function placeholderKey(i: number): string {
+  return `\x01HL_${i}_\x01`;
+}
+
 /** 轻量 nginx 语法高亮（无第三方依赖） */
 export function highlightNginx(code: string): string {
   const placeholders: { key: string; html: string }[] = [];
   let i = 0;
   const ph = (html: string) => {
-    const key = `\x00${i++}\x00`;
+    const key = placeholderKey(i++);
     placeholders.push({ key, html });
     return key;
   };
