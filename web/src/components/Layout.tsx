@@ -5,6 +5,7 @@ import { Button } from "./ui";
 const nav = [
   { to: "/", label: "服务列表", end: true },
   { to: "/audit", label: "操作审计", end: false },
+  { to: "/users", label: "用户管理", end: false, adminOnly: true },
   { to: "/settings", label: "设置", end: false },
 ];
 
@@ -19,7 +20,9 @@ export default function Layout() {
           <div className="text-xs text-slate-400">控制台</div>
         </div>
         <nav className="flex-1 px-3 py-4 space-y-1">
-          {nav.map((n) => (
+          {nav
+            .filter((n) => !n.adminOnly || user?.role === "admin")
+            .map((n) => (
             <NavLink
               key={n.to}
               to={n.to}

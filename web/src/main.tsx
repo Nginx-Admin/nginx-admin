@@ -16,6 +16,7 @@ import ServerDetail from "./pages/ServerDetail";
 import ConfigEditor from "./pages/ConfigEditor";
 import Audit from "./pages/Audit";
 import Settings from "./pages/Settings";
+import Users from "./pages/Users";
 
 function Protected({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -43,6 +44,7 @@ const router = createHashRouter([
       { path: "servers/:id", element: <ServerDetail /> },
       { path: "servers/:id/edit", element: <ConfigEditor /> },
       { path: "audit", element: <Audit /> },
+      { path: "users", element: <Users /> },
       { path: "settings", element: <Settings /> },
     ],
   },

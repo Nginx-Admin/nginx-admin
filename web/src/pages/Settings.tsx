@@ -1,3 +1,6 @@
+import { useEffect, useState } from "react";
+import { useAuth } from "../auth/AuthContext";
+import { api } from "../api/client";
 import { useSettings } from "../settings/SettingsContext";
 import { Button, SettingCard, SettingRow } from "../components/ui";
 
@@ -5,15 +8,152 @@ export default function Settings() {
   return (
     <div className="p-6">
       <h1 className="mb-1 text-xl font-semibold text-slate-800">设置</h1>
-      <p className="mb-6 text-sm text-slate-500">调整界面外观偏好。</p>
+      <p className="mb-6 text-sm text-slate-500">账号、外观与系统偏好。</p>
       <div className="max-w-2xl space-y-5">
+        <PasswordSettings />
+        <AdminSettings />
         <DisplaySettings />
       </div>
     </div>
   );
 }
 
-/* ---------------- 显示设置 ---------------- */
+function PasswordSettings() {
+  const [oldPwd, setOldPwd] = useState("");
+  const [newPwd, setNewPwd] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [msg, setMsg] = useState("");
+  const [err, setErr] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setMsg("");
+    setErr("");
+    if (newPwd.length < 6) {
+      setErr("新密码至少 6 位");
+      return;
+    }
+    if (newPwd !== confirm) {
+      setErr("两次输入的新密码不一致");
+      return;
+    }
+    setBusy(true);
+    try {
+      await api.changePassword(oldPwd, newPwd);
+      setMsg("密码已修改");
+      setOldPwd("");
+      setNewPwd("");
+      setConfirm("");
+    } catch (e) {
+      setErr((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <SettingCard title="修改密码" desc="修改当前登录账号的密码。">
+      <form onSubmit={submit} className="space-y-3 px-5 py-4">
+        <label className="block text-sm">
+          <span className="font-medium text-slate-700">原密码</span>
+          <input
+            type="password"
+            className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+            value={oldPwd}
+            onChange={(e) => setOldPwd(e.target.value)}
+            required
+          />
+        </label>
+        <label className="block text-sm">
+          <span className="font-medium text-slate-700">新密码</span>
+          <input
+            type="password"
+            className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+            value={newPwd}
+            onChange={(e) => setNewPwd(e.target.value)}
+            required
+            minLength={6}
+          />
+        </label>
+        <label className="block text-sm">
+          <span className="font-medium text-slate-700">确认新密码</span>
+          <input
+            type="password"
+            className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+            value={confirm}
+            onChange={(e) => setConfirm(e.target.value)}
+            required
+          />
+        </label>
+        {msg && <p className="text-sm text-green-600">{msg}</p>}
+        {err && <p className="text-sm text-red-600">{err}</p>}
+        <Button type="submit" disabled={busy}>
+          {busy ? "保存中…" : "更新密码"}
+        </Button>
+      </form>
+    </SettingCard>
+  );
+}
+
+function AdminSettings() {
+  const { user } = useAuth();
+  const [retain, setRetain] = useState(5);
+  const [msg, setMsg] = useState("");
+  const [err, setErr] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (user?.role !== "admin") return;
+    api
+      .getSettings()
+      .then((r) => setRetain(r.retain_per_file))
+      .catch(() => {});
+  }, [user?.role]);
+
+  if (user?.role !== "admin") return null;
+
+  const save = async () => {
+    setBusy(true);
+    setMsg("");
+    setErr("");
+    try {
+      const r = await api.updateSettings(retain);
+      setRetain(r.retain_per_file);
+      setMsg("已保存（中心数据库备份保留策略，Agent 本地快照由 Agent 端 config 控制）");
+    } catch (e) {
+      setErr((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <SettingCard
+      title="备份策略（中心）"
+      desc="中心数据库层每文件保留份数（当前写入流程以 Agent 本地快照为主，此值为预留策略）。"
+    >
+      <SettingRow label="每文件保留份数" desc="1 ~ 1000">
+        <div className="flex items-center gap-2">
+          <input
+            type="number"
+            min={1}
+            max={1000}
+            className="w-24 rounded-md border border-slate-300 px-2 py-1 text-sm"
+            value={retain}
+            onChange={(e) => setRetain(Number(e.target.value))}
+          />
+          <Button variant="secondary" onClick={save} disabled={busy}>
+            保存
+          </Button>
+        </div>
+      </SettingRow>
+      {msg && <p className="px-5 pb-3 text-sm text-green-600">{msg}</p>}
+      {err && <p className="px-5 pb-3 text-sm text-red-600">{err}</p>}
+    </SettingCard>
+  );
+}
+
 function DisplaySettings() {
   const { prefs, setPrefs, reset } = useSettings();
   const fonts = [
@@ -98,26 +238,11 @@ function DisplaySettings() {
             </span>
           </div>
         </SettingRow>
-        <div className="px-5 py-4">
-          <div className="mb-1.5 text-xs text-slate-400">实时预览</div>
-          <pre
-            className="code overflow-x-auto rounded-md border border-slate-200 bg-slate-50 p-3 text-slate-700"
-            style={{ fontSize: prefs.editorFontSize }}
-          >
-{`server {
-    listen 80;
-    server_name example.com;
-    location / {
-        proxy_pass http://backend;
-    }
-}`}
-          </pre>
-        </div>
       </SettingCard>
 
       <div className="flex justify-end">
         <Button variant="secondary" onClick={reset}>
-          恢复默认
+          恢复默认外观
         </Button>
       </div>
     </>

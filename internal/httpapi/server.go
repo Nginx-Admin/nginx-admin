@@ -52,8 +52,19 @@ func (s *Server) Router() *gin.Engine {
 			authed.GET("/auth/me", s.handleMe)
 			authed.POST("/auth/change-password", s.handleChangePassword)
 
+			// 用户管理（admin）
+			authed.GET("/users", s.RequireRole("admin"), s.handleListUsers)
+			authed.POST("/users", s.RequireRole("admin"), s.handleCreateUser)
+			authed.PUT("/users/:id", s.RequireRole("admin"), s.handleUpdateUser)
+			authed.DELETE("/users/:id", s.RequireRole("admin"), s.handleDeleteUser)
+
+			// 全局设置（admin）
+			authed.GET("/settings", s.RequireRole("admin"), s.handleGetSettings)
+			authed.PUT("/settings", s.RequireRole("admin"), s.handleUpdateSettings)
+
 			// 服务器（Agent）管理
 			authed.GET("/servers", s.handleListServers)
+			authed.POST("/servers/test-connection", s.RequireRole("admin"), s.handleTestConnection)
 			authed.POST("/servers", s.RequireRole("admin"), s.handleCreateServer)
 			authed.GET("/servers/:id", s.handleGetServer)
 			authed.PUT("/servers/:id", s.RequireRole("admin"), s.handleUpdateServer)

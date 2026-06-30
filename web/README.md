@@ -17,13 +17,12 @@ web/
     ├── api/client.ts       # 后端 REST API 封装（带 JWT）
     ├── auth/AuthContext.tsx# 登录态 / 路由守卫
     ├── components/         # Layout 侧边栏、通用 UI
-    ├── pages/              # Login / Servers / ServerDetail / ConfigEditor / Audit
+    ├── pages/              # Login / Servers / ServerDetail / ConfigEditor / Audit / Users / Settings
     └── canvas/             # 节点式画布核心
-        ├── nginxParser.ts  # nginx 配置 ↔ 节点模型 双向解析/回写
+        ├── directives.ts   # crossplane 指令树辅助（增删改、块模板）
         ├── nodes.tsx       # Server/Location/Upstream 自定义节点
-        ├── Canvas.tsx      # ParsedConfig → React Flow nodes/edges
-        ├── PropertyPanel.tsx # 选中节点的属性编辑面板
-        └── matcher.ts      # 流量模拟：按 nginx 优先级匹配 location
+        ├── Canvas.tsx      # 指令树 → React Flow nodes/edges
+        └── PropertyPanel.tsx # 选中块的属性编辑 + 快捷添加 server/location/upstream
 ```
 
 ## 开发与构建
@@ -44,19 +43,21 @@ go build -o bin/nginx-admin ./cmd/nginx-admin
 
 > 未构建前端时，`dist/` 仅有占位页，后端会返回提示页；不影响后端 API 运行。
 
-## 画布说明（重要）
+## 画布说明
 
-- **画布是 nginx 配置的可视化投影**：`nginxParser.ts` 把配置文本解析为 server/location/upstream 节点模型，
-  保存时再回写为标准配置文本，经后端 `nginx -t` 校验 + reload + 失败自动回滚。
-- **已知限制**：当前为前端轻量解析器，对 server/location/upstream 及其常用指令建模；
-  其它块/指令作为"原样片段"保留（往返不丢），**注释会被丢弃**。复杂配置请用「源码模式」编辑。
-- 设计文档中规划的"后端 crossplane 精确解析"可作为后续增强，替换 `nginxParser.ts` 的解析来源即可，
-  画布与属性面板无需改动。
+- **解析/回写**：走后端 crossplane 接口（`POST /api/nginx/parse`、`/api/nginx/build`），注释与复杂指令保真。
+- **双模式**：画布可视化 + 源码直接编辑，保存时统一走 Agent 安全闭环（快照 → 写入 → nginx -t → reload）。
+- **快捷添块**：画布左上角可添加顶层 Server/Upstream；属性面板内可按块类型添加 Server/Location/Upstream。
+- **快照**：编辑器顶栏「快照」可查看 Agent 本地备份并一键回滚。
 
 ## 功能对应页面
 
-- 登录：`/login`
-- 服务器列表 / 新增 / 删除：`/`
-- 服务器详情（状态、配置发现、nginx -t、reload）：`/servers/:id`
-- 配置编辑器（画布 + 源码双模式 + 流量模拟 + 保存走安全闭环）：`/servers/:id/edit?path=...`
-- 操作审计：`/audit`
+| 路由 | 功能 |
+|------|------|
+| `#/login` | 登录 |
+| `#/` | 服务器列表（分组、刷新全部状态、纳管时测试 Agent 连通） |
+| `#/servers/:id` | 详情（状态、配置发现、nginx -t、reload、新建子配置） |
+| `#/servers/:id/edit?path=` | 配置编辑器（画布/源码、快照回滚） |
+| `#/audit` | 操作审计（用户名/服务器名、搜索） |
+| `#/users` | 用户管理（admin） |
+| `#/settings` | 改密码、中心备份策略（admin）、界面外观 |

@@ -5,6 +5,9 @@ import {
   isComment,
   newDirective,
   removeNode,
+  templateLocationBlock,
+  templateServerBlock,
+  templateUpstreamBlock,
   updateArgs,
   updateComment,
   updateDirectiveName,
@@ -151,6 +154,60 @@ function AddBtn({ onClick }: { onClick: () => void }) {
   );
 }
 
+/** 按块类型提供 server / location / upstream 快捷添加 */
+function BlockShortcuts({
+  dirs,
+  selectedPath,
+  node,
+  onChange,
+}: {
+  dirs: Directive[];
+  selectedPath: NodePath;
+  node: Directive;
+  onChange: (next: Directive[]) => void;
+}) {
+  const add = (tpl: Directive) => onChange(appendChild(dirs, selectedPath, tpl));
+  const d = node.directive;
+
+  let buttons: { label: string; tpl: Directive }[] = [];
+  if (d === "server") {
+    buttons = [{ label: "+ Location", tpl: templateLocationBlock() }];
+  } else if (d === "upstream") {
+    buttons = [
+      {
+        label: "+ Backend",
+        tpl: { directive: "server", args: ["127.0.0.1:8080"] },
+      },
+    ];
+  } else if (
+    d === "http" ||
+    d === "events" ||
+    (isBlock(node) && d !== "location")
+  ) {
+    buttons = [
+      { label: "+ Server", tpl: templateServerBlock() },
+      { label: "+ Upstream", tpl: templateUpstreamBlock() },
+    ];
+  }
+
+  if (buttons.length === 0) return null;
+
+  return (
+    <div className="mb-3 flex flex-wrap gap-2">
+      {buttons.map((b) => (
+        <button
+          key={b.label}
+          type="button"
+          onClick={() => add(b.tpl)}
+          className="rounded-md border border-brand-200 bg-brand-50 px-2 py-1 text-xs text-brand-700 hover:bg-brand-100"
+        >
+          {b.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 export default function PropertyPanel({ dirs, selectedPath, onChange }: Props) {
   if (!selectedPath) {
     return (
@@ -231,6 +288,12 @@ export default function PropertyPanel({ dirs, selectedPath, onChange }: Props) {
       <p className="mb-3 text-xs text-slate-400">
         块内指令（含注释，编辑后保存走 nginx -t 校验）
       </p>
+      <BlockShortcuts
+        dirs={dirs}
+        selectedPath={selectedPath}
+        node={node}
+        onChange={onChange}
+      />
       <DirectiveList
         dirs={dirs}
         basePath={selectedPath}

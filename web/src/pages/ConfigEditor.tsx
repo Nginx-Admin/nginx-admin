@@ -1,12 +1,17 @@
 import { useCallback, useEffect, useState } from "react";
 import { ReactFlowProvider } from "@xyflow/react";
 import { useParams, useSearchParams, useNavigate } from "react-router-dom";
-import { api, type Directive } from "../api/client";
+import { api, type Directive, type LocalBackup } from "../api/client";
 import { Button } from "../components/ui";
 import { useAuth } from "../auth/AuthContext";
 import Canvas from "../canvas/Canvas";
 import PropertyPanel from "../canvas/PropertyPanel";
-import type { NodePath } from "../canvas/directives";
+import {
+  appendChild,
+  templateServerBlock,
+  templateUpstreamBlock,
+  type NodePath,
+} from "../canvas/directives";
 
 type Mode = "canvas" | "source";
 
@@ -40,7 +45,12 @@ export default function ConfigEditor() {
   >(null);
   const [err, setErr] = useState("");
 
-  // 全局 upstream 名单（跨文件，供画布连线指向外部文件定义的 upstream）
+  const [showBackups, setShowBackups] = useState(false);
+  const [backups, setBackups] = useState<LocalBackup[]>([]);
+  const [backupLoading, setBackupLoading] = useState(false);
+  const [rollbackBusy, setRollbackBusy] = useState(false);
+
+  // 全局 upstream 名单
   const [externalUpstreams, setExternalUpstreams] = useState<
     { name: string; logical_path: string }[]
   >([]);
@@ -93,6 +103,43 @@ export default function ConfigEditor() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, path]);
+
+  const loadBackups = useCallback(async () => {
+    setBackupLoading(true);
+    try {
+      const r = await api.listBackups(id, path);
+      setBackups(r.local || []);
+    } catch {
+      setBackups([]);
+    } finally {
+      setBackupLoading(false);
+    }
+  }, [id, path]);
+
+  useEffect(() => {
+    if (showBackups) loadBackups();
+  }, [showBackups, loadBackups]);
+
+  const doRollback = async (backupRef: string) => {
+    if (!confirm("确定回滚到此快照？将覆盖当前文件并 reload。")) return;
+    setRollbackBusy(true);
+    setErr("");
+    setMsg("");
+    try {
+      const r = await api.rollback(id, backupRef);
+      if (r.ok) {
+        setMsg("回滚成功\n" + (r.output || ""));
+        setShowBackups(false);
+        await load();
+      } else {
+        setErr(r.error || "回滚失败");
+      }
+    } catch (e) {
+      setErr((e as Error).message);
+    } finally {
+      setRollbackBusy(false);
+    }
+  };
 
   useEffect(() => {
     load();
@@ -212,12 +259,68 @@ export default function ConfigEditor() {
 
         <div className="ml-auto flex items-center gap-2">
           {canEdit && (
-            <Button onClick={save} disabled={saving}>
-              {saving ? "保存中..." : "保存并应用"}
-            </Button>
+            <>
+              <Button
+                variant="secondary"
+                onClick={() => setShowBackups((v) => !v)}
+              >
+                {showBackups ? "关闭快照" : "快照"}
+              </Button>
+              <Button onClick={save} disabled={saving}>
+                {saving ? "保存中..." : "保存并应用"}
+              </Button>
+            </>
           )}
         </div>
       </div>
+
+      {/* Agent 本地快照列表 */}
+      {showBackups && (
+        <div className="border-b border-slate-200 bg-slate-50 px-4 py-3">
+          <div className="mb-2 flex items-center justify-between">
+            <span className="text-sm font-medium text-slate-700">
+              Agent 本地快照 · {path}
+            </span>
+            <button
+              type="button"
+              onClick={loadBackups}
+              className="text-xs text-brand-600 hover:underline"
+            >
+              刷新
+            </button>
+          </div>
+          {backupLoading ? (
+            <p className="text-sm text-slate-400">加载中…</p>
+          ) : backups.length === 0 ? (
+            <p className="text-sm text-slate-400">暂无快照（保存配置时会自动创建）</p>
+          ) : (
+            <ul className="max-h-40 space-y-1 overflow-y-auto">
+              {backups.map((b) => (
+                <li
+                  key={b.backup_ref}
+                  className="flex items-center justify-between gap-2 rounded border border-slate-200 bg-white px-3 py-2 text-xs"
+                >
+                  <div>
+                    <div className="font-mono text-slate-600">
+                      {new Date(b.created_at_unix * 1000).toLocaleString()}
+                    </div>
+                    <div className="text-slate-400">{b.note || b.backup_ref}</div>
+                  </div>
+                  {canEdit && (
+                    <Button
+                      variant="warning"
+                      disabled={rollbackBusy}
+                      onClick={() => doRollback(b.backup_ref)}
+                    >
+                      回滚
+                    </Button>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
 
       {/* 保存的分阶段结果：nginx -t / reload 分两步展示 */}
       {stages && (
@@ -260,6 +363,28 @@ export default function ConfigEditor() {
       <div className="relative flex flex-1 overflow-hidden">
         {mode === "canvas" ? (
           <>
+            {canEdit && dirs && (
+              <div className="absolute left-3 top-3 z-10 flex gap-2">
+                <button
+                  type="button"
+                  className="rounded-md border border-slate-300 bg-white px-2 py-1 text-xs text-slate-700 shadow-sm hover:bg-slate-50"
+                  onClick={() =>
+                    setDirs(appendChild(dirs, [], templateServerBlock()))
+                  }
+                >
+                  + Server
+                </button>
+                <button
+                  type="button"
+                  className="rounded-md border border-slate-300 bg-white px-2 py-1 text-xs text-slate-700 shadow-sm hover:bg-slate-50"
+                  onClick={() =>
+                    setDirs(appendChild(dirs, [], templateUpstreamBlock()))
+                  }
+                >
+                  + Upstream
+                </button>
+              </div>
+            )}
             <div className="flex-1">
               {dirs && (
                 <ReactFlowProvider>

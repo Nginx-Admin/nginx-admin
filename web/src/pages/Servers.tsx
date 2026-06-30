@@ -39,8 +39,8 @@ export default function Servers() {
   const [err, setErr] = useState("");
   const [showCreate, setShowCreate] = useState(false);
   const [editing, setEditing] = useState<Server | null>(null);
-  // 折叠的分组
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  const [refreshingAll, setRefreshingAll] = useState(false);
 
   const load = () => {
     setLoading(true);
@@ -83,13 +83,38 @@ export default function Servers() {
   const toggle = (name: string) =>
     setCollapsed((c) => ({ ...c, [name]: !c[name] }));
 
+  const refreshAllStatus = async () => {
+    if (servers.length === 0) return;
+    setRefreshingAll(true);
+    setErr("");
+    try {
+      await Promise.allSettled(
+        servers.map((s) => api.serverStatus(s.id))
+      );
+      load();
+    } finally {
+      setRefreshingAll(false);
+    }
+  };
+
   return (
     <div className="p-6">
       <div className="mb-4 flex items-center justify-between">
         <h1 className="text-xl font-semibold text-slate-800">服务列表</h1>
-        {isAdmin && (
-          <Button onClick={() => setShowCreate(true)}>+ 新增服务</Button>
-        )}
+        <div className="flex gap-2">
+          {servers.length > 0 && (
+            <Button
+              variant="info"
+              onClick={refreshAllStatus}
+              disabled={refreshingAll || loading}
+            >
+              {refreshingAll ? "刷新中…" : "刷新全部状态"}
+            </Button>
+          )}
+          {isAdmin && (
+            <Button onClick={() => setShowCreate(true)}>+ 新增服务</Button>
+          )}
+        </div>
       </div>
 
       {err && <p className="mb-3 text-sm text-red-600">{err}</p>}
@@ -216,6 +241,32 @@ function ServerModal({
   );
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [connMsg, setConnMsg] = useState("");
+
+  const testConn = async () => {
+    const addr = address.trim();
+    if (!/:\d+$/.test(addr)) {
+      setErr("地址需包含端口，例如 10.0.0.12:7443");
+      return;
+    }
+    setTesting(true);
+    setConnMsg("");
+    setErr("");
+    try {
+      const r = await api.testConnection(addr);
+      if (r.ok) {
+        setConnMsg(`连通正常 · Agent ${r.agent_version || ""}`);
+      } else {
+        setConnMsg("");
+        setErr(r.error || "无法连接 Agent");
+      }
+    } catch (e) {
+      setErr((e as Error).message);
+    } finally {
+      setTesting(false);
+    }
+  };
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -298,6 +349,20 @@ function ServerModal({
             ))}
           </datalist>
         </label>
+
+        <div className="mt-3 flex items-center gap-2">
+          <Button
+            type="button"
+            variant="info"
+            onClick={testConn}
+            disabled={testing || !address.trim()}
+          >
+            {testing ? "测试中…" : "测试连通"}
+          </Button>
+          {connMsg && (
+            <span className="text-sm text-green-600">{connMsg}</span>
+          )}
+        </div>
 
         {err && <p className="mt-3 text-sm text-red-600">{err}</p>}
         <div className="mt-5 flex items-center gap-2">

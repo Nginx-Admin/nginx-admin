@@ -130,6 +130,39 @@ export function newBlock(name = "server", args: string[] = []): Directive {
   return { directive: name, args, block: [] };
 }
 
+/** 常用块模板（画布快捷添加） */
+export function templateServerBlock(): Directive {
+  return {
+    directive: "server",
+    args: [],
+    block: [
+      { directive: "listen", args: ["80"] },
+      { directive: "server_name", args: ["example.com"] },
+      {
+        directive: "location",
+        args: ["/"],
+        block: [{ directive: "proxy_pass", args: ["http://127.0.0.1:8080"] }],
+      },
+    ],
+  };
+}
+
+export function templateLocationBlock(): Directive {
+  return {
+    directive: "location",
+    args: ["/"],
+    block: [{ directive: "proxy_pass", args: ["http://127.0.0.1:8080"] }],
+  };
+}
+
+export function templateUpstreamBlock(): Directive {
+  return {
+    directive: "upstream",
+    args: ["backend"],
+    block: [{ directive: "server", args: ["127.0.0.1:8080"] }],
+  };
+}
+
 // 是否块指令
 export function isBlock(d: Directive): boolean {
   return Array.isArray(d.block);

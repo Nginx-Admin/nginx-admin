@@ -4,6 +4,8 @@ export interface User {
   id: string;
   username: string;
   role: "admin" | "editor" | "viewer";
+  disabled?: boolean;
+  created_at?: string;
 }
 
 export interface Server {
@@ -40,13 +42,12 @@ export interface ReadConfigResp {
   checksum: string;
 }
 
-// crossplane 指令树节点（方案 B：画布直接消费此结构，保真注释与所有指令）。
 export interface Directive {
-  directive: string; // 指令名，注释为 "#"
+  directive: string;
   line?: number;
-  args: string[]; // 参数
-  block?: Directive[]; // 块指令的子指令
-  comment?: string; // 当 directive === "#" 时的注释内容
+  args: string[];
+  block?: Directive[];
+  comment?: string;
 }
 
 export interface WriteConfigResp {
@@ -72,7 +73,9 @@ export interface LocalBackup {
 export interface AuditLog {
   id: number;
   actor_id: string;
+  actor_username?: string;
   server_id: string;
+  server_name?: string;
   action: string;
   target: string;
   result: string;
@@ -141,7 +144,6 @@ async function request<T>(
 }
 
 export const api = {
-  // 认证
   login: (username: string, password: string) =>
     request<{ token: string; user: User }>("POST", "/auth/login", {
       username,
@@ -154,8 +156,30 @@ export const api = {
       new_password,
     }),
 
-  // 服务器
+  listUsers: () => request<{ users: User[] }>("GET", "/users"),
+  createUser: (username: string, password: string, role: User["role"]) =>
+    request<User>("POST", "/users", { username, password, role }),
+  updateUser: (
+    id: string,
+    patch: { role?: User["role"]; disabled?: boolean; password?: string }
+  ) => request<User>("PUT", `/users/${id}`, patch),
+  deleteUser: (id: string) =>
+    request<{ ok: boolean }>("DELETE", `/users/${id}`),
+
+  getSettings: () =>
+    request<{ retain_per_file: number }>("GET", "/settings"),
+  updateSettings: (retain_per_file: number) =>
+    request<{ retain_per_file: number }>("PUT", "/settings", {
+      retain_per_file,
+    }),
+
   listServers: () => request<{ servers: Server[] }>("GET", "/servers"),
+  testConnection: (address: string) =>
+    request<{ ok: boolean; agent_version?: string; error?: string }>(
+      "POST",
+      "/servers/test-connection",
+      { address }
+    ),
   createServer: (name: string, address: string, labels?: string) =>
     request<Server>("POST", "/servers", { name, address, labels }),
   getServer: (id: string) => request<Server>("GET", `/servers/${id}`),
@@ -165,7 +189,6 @@ export const api = {
     request<{ ok: boolean }>("DELETE", `/servers/${id}`),
   serverStatus: (id: string) =>
     request<ServerStatus>("GET", `/servers/${id}/status`),
-  // 缓存状态（不打 Agent，秒返回，供详情页先显示）
   serverStatusCached: (id: string) =>
     request<ServerStatus>("GET", `/servers/${id}/status/cached`),
   discover: (id: string) =>
@@ -174,16 +197,13 @@ export const api = {
       `/servers/${id}/discover`
     ),
 
-  // 配置
   listConfigs: (id: string) =>
     request<{ files: ConfigFileInfo[] }>("GET", `/servers/${id}/configs`),
-  // 全局 upstream 汇总（跨文件，供画布连线）
   listUpstreams: (id: string) =>
     request<{ upstreams: { name: string; logical_path: string }[] }>(
       "GET",
       `/servers/${id}/upstreams`
     ),
-  // upstream 反向引用：谁（哪个文件的 server/location）用了某 upstream
   listUpstreamRefs: (id: string) =>
     request<{
       refs: {
@@ -213,7 +233,6 @@ export const api = {
   test: (id: string) => request<TestResp>("POST", `/servers/${id}/test`),
   reload: (id: string) => request<TestResp>("POST", `/servers/${id}/reload`),
 
-  // 备份/回滚（仅 Agent 本地快照）
   listBackups: (id: string, path?: string) =>
     request<{ local: LocalBackup[] }>(
       "GET",
@@ -226,10 +245,8 @@ export const api = {
       { backup_ref }
     ),
 
-  // 审计
   listAudit: () => request<{ logs: AuditLog[] }>("GET", "/audit"),
 
-  // nginx 配置精确解析/回写（crossplane，供画布使用）
   parseConfig: (content: string) =>
     request<{ directives: Directive[] }>("POST", "/nginx/parse", { content }),
   buildConfig: (directives: Directive[]) =>

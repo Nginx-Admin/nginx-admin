@@ -89,6 +89,16 @@ func (s *Store) CountUsers() (int64, error) {
 	return n, err
 }
 
+func (s *Store) ListUsers() ([]model.User, error) {
+	var rows []model.User
+	err := s.db.Order("created_at asc").Find(&rows).Error
+	return rows, err
+}
+
+func (s *Store) DeleteUser(id string) error {
+	return s.db.Delete(&model.User{}, "id = ?", id).Error
+}
+
 // ---------- Server ----------
 
 func (s *Store) ListServers() ([]model.Server, error) {
