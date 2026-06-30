@@ -1,44 +1,84 @@
 # nginx-admin
 
-Nginx 可视化管理平台的**中心控制台**（Web 端）。单 Go 二进制，内置前端（`web/dist` 经 `go:embed`），
-提供用户认证、RBAC、服务器（Agent）管理、配置浏览/编辑、语法检测、reload、备份/回滚、操作审计。
-通过 gRPC（over mTLS）调度各台 `nginx-agent`。
+Nginx 可视化管理平台的**中心控制台**（Web 端）。单 Go 二进制，内置前端（`web/dist` 经 `go:embed`），提供用户认证、RBAC、服务器（Agent）管理、配置浏览/编辑、语法检测、reload、备份/回滚与操作审计。通过 gRPC（可选 mTLS）调度各台 [nginx-agent](https://github.com/Nginx-Admin/nginx-agent)。
 
-前端为 **React 18 + TypeScript + Vite + Tailwind**，配置编辑器采用 **React Flow 节点式画布**
-（server / location / upstream 节点化建模，支持画布与源码双模式、流量模拟、HTTPS 跳转连线）。
+> 配套节点代理：[nginx-agent](https://github.com/Nginx-Admin/nginx-agent)（每台 nginx 主机部署一个）。  
+> 详细部署步骤见 [deploy/README.md](deploy/README.md)。
 
-> 配套节点代理：[nginx-agent](https://github.com/Nginx-Admin/nginx-agent)（每台 nginx 主机部署一个）。
+## 架构定位
+
+```
+浏览器 ──HTTP/HTTPS──► nginx-admin (:8080)
+                              │
+                              ├── PostgreSQL（用户/服务器/审计/配置索引）
+                              │
+                              └── gRPC (mTLS) ──► nginx-agent (:7443) × N
+                                                        │
+                                                   本机 nginx
+```
+
+- **单点部署**：全平台只需一个 nginx-admin；每台 nginx 主机部署一个 nginx-agent。
+- **连接方向**：中心主动连接 Agent，Agent 地址在「服务器管理」中登记（`host:7443`）。
+- **前端路由**：Hash 模式（`http://host:8080/#/servers/...`），便于静态托管。
+
+## 功能概览
+
+| 模块 | 说明 |
+|------|------|
+| 认证 | JWT 登录；argon2id 密码哈希；连续失败锁定（IP 维度） |
+| RBAC | `viewer` 只读 / `editor` 编辑与 reload / `admin` 服务器管理 |
+| 服务器管理 | 增删改查 Agent 连接；标签 JSON；在线/离线状态 |
+| 状态监控 | 实时拉取 Agent 状态；数据库缓存快照，详情页秒显后后台刷新 |
+| 配置发现 | 触发 Agent 扫描；索引 checksum；按主配置/子配置分组展示 |
+| 配置编辑 | **画布模式**（React Flow 节点化）+ **源码模式**（直接编辑文本） |
+| 精确解析 | 后端 [nginx-go-crossplane](https://github.com/nginxinc/nginx-go-crossplane) 解析/回写，注释与复杂指令保真 |
+| 安全闭环 | 写入走 Agent：快照 → 写入 → `nginx -t` → reload；失败自动回滚 |
+| 备份/回滚 | Agent 本地快照列表与回滚（中心 UI 展示 Agent 侧备份） |
+| 操作审计 | 登录、配置保存、reload、回滚等操作留痕 |
+
+## Web 页面
+
+| 路由 | 页面 | 权限 |
+|------|------|------|
+| `#/login` | 登录 | 公开 |
+| `#/` | 服务器列表 | 已登录 |
+| `#/servers/:id` | 服务器详情（状态、配置列表、发现、新建子配置） | 已登录 |
+| `#/servers/:id/edit?path=` | 配置编辑器（画布/源码双模式） | editor+ |
+| `#/audit` | 操作审计 | 已登录 |
+| `#/settings` | 界面外观（字号、字体、编辑器字号，存浏览器 localStorage） | 已登录 |
 
 ## 目录结构
 
 ```
 nginx-admin/
-├── api/proto/agent.proto         # gRPC 接口定义（与 nginx-agent 同步）
-├── cmd/nginx-admin/main.go       # 程序入口
+├── api/proto/agent.proto         # gRPC 接口（与 nginx-agent 同步）
+├── cmd/nginx-admin/main.go       # 程序入口（-config / -version）
 ├── internal/
-│   ├── config/                   # 配置加载（config.yaml）
-│   ├── pb/                       # protoc 生成代码（gRPC client）
+│   ├── config/                   # 配置加载
+│   ├── pb/                       # protoc 生成代码
 │   ├── model/                    # GORM 模型 + 自动迁移
-│   ├── store/                    # 数据访问层（GORM/PostgreSQL，连接池 + 备份保留=5）
-│   ├── auth/                     # argon2id 密码哈希 + JWT
-│   ├── agentclient/              # 到各 Agent 的 gRPC 客户端（连接池 + mTLS）
-│   ├── bootstrap/                # 首次启动创建默认管理员
-│   └── httpapi/                  # Gin HTTP 服务：路由、中间件、handlers
-├── web/                          # 前端工程（React + React Flow）
-│   ├── src/                      # 源码：pages / canvas / api / auth / components
-│   ├── dist/                     # 构建产物（经 embed 内嵌；未构建时为占位页）
-│   ├── embed.go                  # go:embed all:dist
-│   └── package.json
+│   ├── store/                    # 数据访问（PostgreSQL）
+│   ├── auth/                     # argon2id + JWT
+│   ├── agentclient/              # Agent gRPC 客户端（mTLS）
+│   ├── bootstrap/                # 首次启动创建默认 admin
+│   ├── nginxconf/                # crossplane 解析/回写
+│   └── httpapi/                  # Gin HTTP 服务
+├── web/                          # 前端（React 18 + TypeScript + Vite + Tailwind）
+│   ├── src/                      # pages / canvas / api / auth / components
+│   ├── dist/                     # 构建产物（go:embed 内嵌）
+│   └── embed.go
 ├── deploy/
-│   └── nginx-admin.service       # systemd 单元
-├── config.yaml                   # 配置示例
+│   ├── nginx-admin.service
+│   ├── install.sh
+│   └── README.md
+├── config.yaml
 └── Makefile
 ```
 
 ## 依赖与前置
 
-- **PostgreSQL**（连接串配在 `config.yaml` 的 `database.dsn`）。
-- 后端：Go 1.26.2、Gin + GORM + gRPC。
+- **PostgreSQL**（DSN 配在 `config.yaml` 的 `database.dsn`）。
+- 后端：Go 1.26.2、Gin + GORM + gRPC + crossplane。
 - 前端构建：Node 18+ / npm。
 
 ## 快速开始
@@ -47,7 +87,7 @@ nginx-admin/
 # 1) 构建前端（产物输出到 web/dist，供 Go 内嵌）
 cd web && npm install && npm run build && cd ..
 
-# 2) 编译后端（前端随之 embed 进二进制）
+# 2) 编译后端
 go build -o nginx-admin ./cmd/nginx-admin
 
 # 3) 准备 PostgreSQL，填好 config.yaml 的 database.dsn
@@ -56,14 +96,11 @@ go build -o nginx-admin ./cmd/nginx-admin
 ./nginx-admin -config ./config.yaml
 ```
 
-启动后浏览器访问 `http://<host>:8080`，默认管理员 `admin` /
-配置项 `auth.default_admin_password`（默认 `admin`，**登录后请立即修改**）。
+浏览器访问 `http://<host>:8080`，默认管理员 `admin` / 配置项 `auth.default_admin_password`（默认 `admin`，**登录后请立即修改**）。
 
-> 未构建前端时，后端仍可启动，访问根路径返回占位页，API 正常可用。
+> 未构建前端时，后端仍可启动：根路径返回占位页，API 正常可用。
 
 ## 部署（systemd）
-
-二进制、配置、前端已内嵌于一个文件，部署到 `/data/nginx-admin/`：
 
 ```bash
 install -D nginx-admin            /data/nginx-admin/nginx-admin
@@ -72,74 +109,136 @@ install -D deploy/nginx-admin.service /usr/lib/systemd/system/nginx-admin.servic
 
 systemctl daemon-reload
 systemctl enable --now nginx-admin
-systemctl status nginx-admin
-journalctl -u nginx-admin -f      # 查看日志
+journalctl -u nginx-admin -f
 ```
 
-> `nginx-admin.service` 内含 `After=postgresql.service`：若 PostgreSQL 同机部署，会等库就绪再启动。
-> 跨机部署 PG 时，请确保网络/防火墙放行 5432，并将 DSN 指向正确地址。
+详见 [deploy/README.md](deploy/README.md)（含 PostgreSQL 初始化 SQL）。
 
-## 主要 API
+## 配置要点（config.yaml）
+
+```yaml
+http:
+  listen: "0.0.0.0:8080"
+  # 生产 HTTPS：
+  # tls_cert: /data/nginx-admin/tls/server.crt
+  # tls_key:  /data/nginx-admin/tls/server.key
+
+database:
+  dsn: "host=127.0.0.1 port=5432 user=nginx_admin password=xxx dbname=nginx_admin sslmode=disable TimeZone=Asia/Shanghai"
+
+auth:
+  jwt_secret: "please-change-this-to-a-long-random-secret"
+  token_ttl_hours: 24
+  max_login_fails: 5            # 同 IP 连续失败阈值
+  lock_minutes: 30              # 锁定时长
+  default_admin_password: "admin"
+
+agent:
+  tls_enabled: false            # 连接 Agent 是否 mTLS（生产开启）
+  dial_timeout_seconds: 15
+
+backup:
+  retain_per_file: 5            # 数据库层备份保留策略的初始默认值
+```
+
+## REST API
+
+### 公开
 
 ```
-POST   /api/auth/login                 # 登录，返回 JWT
-GET    /api/auth/me
-POST   /api/auth/change-password
+GET  /api/health                       # 健康检查（含 version）
+POST /api/auth/login                   # 登录，返回 JWT
+```
 
-GET    /api/servers                    # 服务器列表
-POST   /api/servers                    # 新增（admin）
-GET    /api/servers/:id
+### 需登录（Bearer Token）
+
+```
+GET  /api/auth/me
+POST /api/auth/change-password
+
+GET  /api/servers                      # 服务器列表
+POST /api/servers                      # 新增（admin）
+GET  /api/servers/:id
+PUT  /api/servers/:id                  # 更新名称/地址/标签（admin）
 DELETE /api/servers/:id                # 删除（admin）
-GET    /api/servers/:id/status         # 实时状态（连 Agent）
-POST   /api/servers/:id/discover       # 配置发现（editor）
+GET  /api/servers/:id/status           # 实时状态（连 Agent）
+GET  /api/servers/:id/status/cached    # 缓存状态（秒返回，不打 Agent）
+POST /api/servers/:id/discover         # 配置发现（editor）
 
-GET    /api/servers/:id/configs        # 配置文件列表
-GET    /api/servers/:id/config?path=   # 读取配置
-PUT    /api/servers/:id/config         # 写入（editor，走安全闭环 + 中心副本）
-POST   /api/servers/:id/test           # nginx -t（editor）
-POST   /api/servers/:id/reload         # reload（editor）
+GET  /api/servers/:id/configs          # 配置文件列表
+GET  /api/servers/:id/upstreams        # 全局 upstream 汇总（跨文件，供画布连线）
+GET  /api/servers/:id/upstream-refs    # upstream 反向引用（谁用了某 upstream）
+GET  /api/servers/:id/config?path=     # 读取配置
+PUT  /api/servers/:id/config           # 写入（editor，走 Agent 安全闭环 + 乐观锁）
+POST /api/servers/:id/test             # nginx -t（editor）
+POST /api/servers/:id/reload           # reload（editor）
 
-GET    /api/servers/:id/backups?path=  # 备份（中心副本 + Agent 本地）
-POST   /api/servers/:id/rollback       # 回滚（editor）
+POST /api/nginx/parse                  # crossplane 解析配置文本 → 指令树
+POST /api/nginx/build                  # 指令树 → 配置文本
 
-GET    /api/audit                      # 操作审计
+GET  /api/servers/:id/backups?path=    # Agent 本地快照列表
+POST /api/servers/:id/rollback         # 回滚到 Agent 快照（editor）
+
+GET  /api/audit                        # 操作审计（最近 200 条）
 ```
 
 ## 角色（RBAC）
 
-- `viewer`：只读；`editor`：编辑/reload/回滚；`admin`：用户与服务器管理、全局操作。
+| 角色 | 权限 |
+|------|------|
+| `viewer` | 查看服务器、状态、配置、备份、审计 |
+| `editor` | 在 viewer 基础上：发现、编辑配置、test、reload、回滚 |
+| `admin` | 在 editor 基础上：服务器的增删改 |
+
+> 当前版本首次启动自动创建 `admin` 用户；多用户/角色管理需直接操作数据库或后续扩展 API。
+
+## 配置编辑器
+
+### 画布模式
+
+- 基于 **React Flow**，将 server / location / upstream 节点化展示；
+- 后端 **crossplane** 解析/回写，注释与 map 等复杂指令保真往返；
+- 跨文件 upstream 自动连线（`listUpstreams` 汇总全局 upstream）；
+- HTTP→HTTPS 跳转虚线；内置流量模拟器；
+- 主配置（`nginx.conf`）以结构概览展示内部 server 块。
+
+### 源码模式
+
+- 直接编辑配置文本，适合画布未建模的复杂指令；
+- 与画布共用同一套保存流程与安全闭环。
+
+### 保存流程
+
+```
+PUT /config（带 expected_checksum 乐观锁）
+    ↓
+Agent：快照 → 写入 → nginx -t → reload
+    ↓
+失败：Agent 自动回滚，中心返回 error
+成功：返回 new_checksum
+```
 
 ## 备份策略
 
-写入配置时，中心会先抓取当前内容存为**中心副本**（容灾），并按 `backup.retain_per_file`（默认 **5**）
-保留每个配置文件最近 5 份。Agent 本地另有快照（保留份数由 Agent 端配置控制）。
-
-## 节点式画布
-
-配置编辑器提供两种模式，共用同一条"`nginx -t` 校验 → reload → 失败回滚"安全闭环：
-
-- **画布模式**：server / location / upstream 节点化展示，属性面板编辑常用指令；
-  location → upstream 自动连线（依 `proxy_pass`）；HTTP→HTTPS 跳转自动连虚线；内置流量模拟器。
-- **源码模式**：直接编辑配置文本，覆盖画布未建模的复杂指令。
-
-> 当前画布解析为前端轻量实现（注释会被丢弃，复杂指令走源码模式）；
-> 后续可替换为后端 crossplane 精确解析，画布与面板无需改动。
+- **Agent 本地快照**：每次写入前由 Agent 自动创建（保留份数由 Agent 端 `backup.retain` 控制，默认 50）；
+- **中心展示**：备份列表与回滚均操作 Agent 侧快照（`backup_ref`）；
+- 回滚前 Agent 会再快照一次当前内容，便于撤销回滚。
 
 ## 开发
 
 ```bash
-make proto    # 重新生成 protobuf 代码
-make build    # 构建到 bin/nginx-admin
+make proto       # 重新生成 protobuf
+make frontend    # 构建 web/dist
+make build       # 构建 bin/nginx-admin
 make run
 make vet
 
-cd web && npm run dev   # 前端开发服务器（:5173，/api 代理到 :8080）
+cd web && npm run dev   # 前端 :5173，/api 代理到 :8080
 ```
 
-> 后端 Go 1.26.2；依赖：gin v1.10.0、gorm v1.25.12、grpc v1.67.1 等。
-> 前端：react 18、@xyflow/react（React Flow）、vite、tailwindcss。
+> 后端：gin v1.10.0、gorm v1.25.12、grpc v1.67.1、crossplane v0.4.89  
+> 前端：react 18、@xyflow/react、vite、tailwindcss
 
 ## 许可证
 
 MIT
-
