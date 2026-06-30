@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { api, type Server, type ServerExportBundle, type ServerImportResult } from "../api/client";
+import { api, type Server } from "../api/client";
 import { Button, statusBadge } from "../components/ui";
+import ServerMigrationModal from "../components/ServerMigrationModal";
 import { useAuth } from "../auth/AuthContext";
-import { downloadServerBundle, parseServerImportFile } from "../utils/serverExport";
+import { downloadServerBundle } from "../utils/serverExport";
 
 const UNGROUPED = "未分组";
 
@@ -43,8 +44,7 @@ export default function Servers() {
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const [refreshingAll, setRefreshingAll] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [showImport, setShowImport] = useState(false);
-  const [exportBusy, setExportBusy] = useState(false);
+  const [showMigration, setShowMigration] = useState(false);
 
   const load = () => {
     setLoading(true);
@@ -104,43 +104,7 @@ export default function Servers() {
     else setSelected(new Set(servers.map((s) => s.id)));
   };
 
-  const doExport = async (ids?: string[]) => {
-    setExportBusy(true);
-    setErr("");
-    try {
-      const bundle = await api.exportServers(ids);
-      const suffix =
-        ids && ids.length === 1
-          ? `-${servers.find((s) => s.id === ids[0])?.name || "one"}`
-          : ids && ids.length > 0
-            ? `-selected-${ids.length}`
-            : `-all-${bundle.servers.length}`;
-      downloadServerBundle(
-        bundle,
-        `nginx-admin-servers${suffix.replace(/[^\w.-]+/g, "_")}.json`
-      );
-    } catch (e) {
-      setErr((e as Error).message);
-    } finally {
-      setExportBusy(false);
-    }
-  };
-
-  const exportOne = async (s: Server) => {
-    setExportBusy(true);
-    setErr("");
-    try {
-      const bundle = await api.exportServer(s.id);
-      downloadServerBundle(
-        bundle,
-        `nginx-admin-server-${s.name.replace(/[^\w.-]+/g, "_")}.json`
-      );
-    } catch (e) {
-      setErr((e as Error).message);
-    } finally {
-      setExportBusy(false);
-    }
-  };
+  const clearSelection = () => setSelected(new Set());
 
   const refreshAllStatus = async () => {
     if (servers.length === 0) return;
@@ -160,7 +124,7 @@ export default function Servers() {
     <div className="p-6">
       <div className="mb-4 flex items-center justify-between">
         <h1 className="text-xl font-semibold text-slate-800">服务列表</h1>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {servers.length > 0 && (
             <Button
               variant="info"
@@ -170,32 +134,41 @@ export default function Servers() {
               {refreshingAll ? "刷新中…" : "刷新全部状态"}
             </Button>
           )}
-          {isAdmin && servers.length > 0 && (
-            <>
-              <Button
-                variant="secondary"
-                disabled={exportBusy || selected.size === 0}
-                onClick={() => doExport(Array.from(selected))}
-              >
-                导出选中 ({selected.size})
-              </Button>
-              <Button
-                variant="secondary"
-                disabled={exportBusy}
-                onClick={() => doExport()}
-              >
-                导出全部
-              </Button>
-              <Button variant="secondary" onClick={() => setShowImport(true)}>
-                导入
-              </Button>
-            </>
+          {isAdmin && (
+            <Button variant="secondary" onClick={() => setShowMigration(true)}>
+              迁移
+            </Button>
           )}
           {isAdmin && (
             <Button onClick={() => setShowCreate(true)}>+ 新增服务</Button>
           )}
         </div>
       </div>
+
+      {isAdmin && selected.size > 0 && (
+        <div className="mb-4 flex items-center justify-between rounded-lg border border-brand-200 bg-brand-50/80 px-4 py-2 text-sm dark:border-brand-900 dark:bg-brand-950/40">
+          <span className="text-brand-800 dark:text-brand-200">
+            已选择 <strong>{selected.size}</strong> 项
+          </span>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setShowMigration(true)}
+              className="font-medium text-brand-700 hover:underline dark:text-brand-300"
+            >
+              迁移导出
+            </button>
+            <span className="text-brand-300">|</span>
+            <button
+              type="button"
+              onClick={clearSelection}
+              className="text-slate-600 hover:underline dark:text-slate-400"
+            >
+              取消选择
+            </button>
+          </div>
+        </div>
+      )}
 
       {err && <p className="mb-3 text-sm text-red-600">{err}</p>}
       {loading ? (
@@ -276,30 +249,23 @@ export default function Servers() {
                           {s.nginx_version || "-"}
                         </td>
                         <td className="px-4 py-2 text-right">
-                          <div className="inline-flex gap-2">
+                          <div className="inline-flex items-center gap-1 text-sm">
                             {isAdmin && (
-                              <>
-                                <Button
-                                  variant="secondary"
-                                  disabled={exportBusy}
-                                  onClick={() => exportOne(s)}
-                                >
-                                  导出
-                                </Button>
-                                <Button
-                                  variant="secondary"
-                                  onClick={() => setEditing(s)}
-                                >
-                                  编辑
-                                </Button>
-                              </>
+                              <button
+                                type="button"
+                                onClick={() => setEditing(s)}
+                                className="rounded px-2 py-1 text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800"
+                              >
+                                编辑
+                              </button>
                             )}
-                            <Button
-                              variant="secondary"
+                            <button
+                              type="button"
                               onClick={() => nav(`/servers/${s.id}`)}
+                              className="rounded px-2 py-1 font-medium text-brand-600 hover:bg-brand-50 dark:text-brand-400 dark:hover:bg-brand-950/50"
                             >
                               管理
-                            </Button>
+                            </button>
                           </div>
                         </td>
                       </tr>
@@ -328,131 +294,18 @@ export default function Servers() {
         />
       )}
 
-      {showImport && (
-        <ImportModal
-          onClose={() => setShowImport(false)}
-          onDone={() => {
-            setShowImport(false);
+      {showMigration && (
+        <ServerMigrationModal
+          servers={servers}
+          selectedIds={selected}
+          onClose={() => setShowMigration(false)}
+          onImported={() => {
+            setShowMigration(false);
             setSelected(new Set());
             load();
           }}
         />
       )}
-    </div>
-  );
-}
-
-function ImportModal({
-  onClose,
-  onDone,
-}: {
-  onClose: () => void;
-  onDone: () => void;
-}) {
-  const inputRef = useRef<HTMLInputElement>(null);
-  const [mode, setMode] = useState<"skip" | "update">("skip");
-  const [preview, setPreview] = useState<ServerExportBundle | null>(null);
-  const [result, setResult] = useState<ServerImportResult | null>(null);
-  const [err, setErr] = useState("");
-  const [busy, setBusy] = useState(false);
-
-  const onFile = async (file: File | null) => {
-    setErr("");
-    setResult(null);
-    setPreview(null);
-    if (!file) return;
-    try {
-      const text = await file.text();
-      setPreview(parseServerImportFile(text));
-    } catch (e) {
-      setErr((e as Error).message);
-    }
-  };
-
-  const submit = async () => {
-    if (!preview) {
-      setErr("请先选择 JSON 文件");
-      return;
-    }
-    setBusy(true);
-    setErr("");
-    try {
-      const r = await api.importServers(preview, mode);
-      setResult(r);
-      if (r.failed === 0) onDone();
-    } catch (e) {
-      setErr((e as Error).message);
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 z-10 flex items-center justify-center bg-black/30 p-4">
-      <div className="w-full max-w-lg rounded-xl bg-white p-6 shadow-lg">
-        <h2 className="text-lg font-semibold text-slate-800">导入服务</h2>
-        <p className="mt-1 text-sm text-slate-500">
-          上传导出的 JSON 文件，按 Agent 地址迁移纳管信息（不含配置内容）。
-        </p>
-        <input
-          ref={inputRef}
-          type="file"
-          accept="application/json,.json"
-          className="mt-4 block w-full text-sm"
-          onChange={(e) => onFile(e.target.files?.[0] ?? null)}
-        />
-        {preview && (
-          <p className="mt-2 text-sm text-slate-600">
-            已解析 {preview.servers.length} 条服务
-            {preview.exported_at ? ` · 导出于 ${preview.exported_at}` : ""}
-          </p>
-        )}
-        <fieldset className="mt-4 space-y-2 text-sm">
-          <legend className="font-medium text-slate-700">地址已存在时</legend>
-          <label className="flex items-center gap-2">
-            <input
-              type="radio"
-              checked={mode === "skip"}
-              onChange={() => setMode("skip")}
-            />
-            跳过（保留现有）
-          </label>
-          <label className="flex items-center gap-2">
-            <input
-              type="radio"
-              checked={mode === "update"}
-              onChange={() => setMode("update")}
-            />
-            更新名称与分组标签
-          </label>
-        </fieldset>
-        {result && (
-          <div className="mt-3 rounded-md bg-slate-50 p-3 text-sm text-slate-700">
-            新建 {result.created} · 更新 {result.updated} · 跳过 {result.skipped}
-            {result.failed > 0 && ` · 失败 ${result.failed}`}
-            {result.errors.length > 0 && (
-              <ul className="mt-2 list-inside list-disc text-red-600">
-                {result.errors.slice(0, 5).map((e) => (
-                  <li key={e}>{e}</li>
-                ))}
-              </ul>
-            )}
-          </div>
-        )}
-        {err && <p className="mt-3 text-sm text-red-600">{err}</p>}
-        <div className="mt-5 flex justify-end gap-2">
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-md px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-100"
-          >
-            关闭
-          </button>
-          <Button onClick={submit} disabled={busy || !preview}>
-            {busy ? "导入中…" : "开始导入"}
-          </Button>
-        </div>
-      </div>
     </div>
   );
 }
@@ -617,12 +470,17 @@ function ServerModal({
         </div>
 
         {err && <p className="mt-3 text-sm text-red-600">{err}</p>}
-        <div className="mt-5 flex items-center gap-2">
+        <div className="mt-5 flex flex-wrap items-center gap-2">
           {isEdit && (
             <>
-              <Button type="button" variant="secondary" onClick={doExport} disabled={busy}>
-                导出
-              </Button>
+              <button
+                type="button"
+                onClick={doExport}
+                disabled={busy}
+                className="text-sm text-slate-500 hover:text-slate-800 hover:underline disabled:opacity-50"
+              >
+                导出此服务 JSON
+              </button>
               <Button
                 type="button"
                 variant="danger"

@@ -6,7 +6,10 @@ import Servers from "../pages/Servers";
 import ServerDetail from "../pages/ServerDetail";
 import ConfigEditor from "../pages/ConfigEditor";
 import Audit from "../pages/Audit";
-import Settings from "../pages/Settings";
+import SettingsLayout from "../settings/SettingsLayout";
+import AccountPanel from "../settings/panels/AccountPanel";
+import AppearancePanel from "../settings/panels/AppearancePanel";
+import EditorPanel from "../settings/panels/EditorPanel";
 import Users from "../pages/Users";
 
 function Protected({ children }: { children: React.ReactNode }) {
@@ -37,7 +40,16 @@ export const router = createHashRouter([
       { path: "servers/:id/edit", element: <ConfigEditor /> },
       { path: "audit", element: <Audit /> },
       { path: "users", element: <Users /> },
-      { path: "settings", element: <Settings /> },
+      {
+        path: "settings",
+        element: <SettingsLayout />,
+        children: [
+          { index: true, element: <Navigate to="account" replace /> },
+          { path: "account", element: <AccountPanel /> },
+          { path: "appearance", element: <AppearancePanel /> },
+          { path: "editor", element: <EditorPanel /> },
+        ],
+      },
     ],
   },
 ]);
