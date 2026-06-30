@@ -36,12 +36,17 @@ pre.code {
   font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
   font-size: var(--editor-font-size);
   line-height: 1.5;
+  tab-size: 4;
+}
+
+/* 透明输入层：Safari 需 -webkit-text-fill-color 才能真正隐藏文字 */
+.source-editor-input {
+  -webkit-text-fill-color: transparent;
 }
 
 /* nginx 源码高亮 token */
 .tok-keyword {
   color: #7c3aed;
-  font-weight: 600;
 }
 html.dark .tok-keyword {
   color: #a78bfa;
@@ -54,7 +59,6 @@ html.dark .tok-string {
 }
 .tok-comment {
   color: #94a3b8;
-  font-style: italic;
 }
 .tok-number {
   color: #d97706;

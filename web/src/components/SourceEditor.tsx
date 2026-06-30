@@ -67,13 +67,13 @@ export default function SourceEditor({ value, onChange, readOnly }: Props) {
       <pre
         ref={preRef}
         aria-hidden
-        className="code pointer-events-none absolute left-10 right-0 top-0 m-0 overflow-hidden whitespace-pre py-4 pl-3 pr-4 text-transparent"
+        className="code pointer-events-none absolute left-10 right-0 top-0 m-0 overflow-hidden whitespace-pre py-4 pl-3 pr-4 text-slate-800 dark:text-slate-100"
         style={{ fontSize: "var(--editor-font-size)" }}
         dangerouslySetInnerHTML={{ __html: html }}
       />
       <textarea
         ref={taRef}
-        className="code absolute left-10 right-0 top-0 m-0 h-full w-[calc(100%-2.5rem)] resize-none overflow-auto border-0 bg-transparent py-4 pl-3 pr-4 text-slate-800 caret-slate-900 focus:outline-none dark:text-slate-100 dark:caret-slate-100"
+        className="source-editor-input code absolute left-10 right-0 top-0 m-0 h-full w-[calc(100%-2.5rem)] resize-none overflow-auto border-0 bg-transparent py-4 pl-3 pr-4 text-transparent caret-slate-900 focus:outline-none dark:caret-slate-100"
         style={{ fontSize: "var(--editor-font-size)", lineHeight: 1.5 }}
         value={value}
         onChange={(e) => onChange(e.target.value)}
