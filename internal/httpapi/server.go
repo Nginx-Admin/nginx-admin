@@ -79,6 +79,7 @@ func (s *Server) Router() *gin.Engine {
 			authed.GET("/servers/:id/upstream-refs", s.handleUpstreamRefs) // upstream 反向引用（谁用了）
 			authed.GET("/servers/:id/config", s.handleReadConfig)          // ?path=
 			authed.PUT("/servers/:id/config", s.RequireRole("editor"), s.handleWriteConfig)
+			authed.DELETE("/servers/:id/config", s.RequireRole("editor"), s.handleDeleteConfig)
 			authed.POST("/servers/:id/test", s.RequireRole("editor"), s.handleTest)
 			authed.POST("/servers/:id/reload", s.RequireRole("editor"), s.handleReload)
 

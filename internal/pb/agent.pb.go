@@ -705,6 +705,126 @@ func (x *WriteConfigReply) GetError() string {
 	return ""
 }
 
+type DeleteConfigRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	LogicalPath   string                 `protobuf:"bytes,1,opt,name=logical_path,json=logicalPath,proto3" json:"logical_path,omitempty"`
+	Actor         string                 `protobuf:"bytes,2,opt,name=actor,proto3" json:"actor,omitempty"`
+	AutoBackup    bool                   `protobuf:"varint,3,opt,name=auto_backup,json=autoBackup,proto3" json:"auto_backup,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeleteConfigRequest) Reset() {
+	*x = DeleteConfigRequest{}
+	mi := &file_agent_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeleteConfigRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteConfigRequest) ProtoMessage() {}
+
+func (x *DeleteConfigRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_agent_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteConfigRequest.ProtoReflect.Descriptor instead.
+func (*DeleteConfigRequest) Descriptor() ([]byte, []int) {
+	return file_agent_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *DeleteConfigRequest) GetLogicalPath() string {
+	if x != nil {
+		return x.LogicalPath
+	}
+	return ""
+}
+
+func (x *DeleteConfigRequest) GetActor() string {
+	if x != nil {
+		return x.Actor
+	}
+	return ""
+}
+
+func (x *DeleteConfigRequest) GetAutoBackup() bool {
+	if x != nil {
+		return x.AutoBackup
+	}
+	return false
+}
+
+type DeleteConfigReply struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Ok            bool                   `protobuf:"varint,1,opt,name=ok,proto3" json:"ok,omitempty"`
+	BackupRef     string                 `protobuf:"bytes,2,opt,name=backup_ref,json=backupRef,proto3" json:"backup_ref,omitempty"`
+	Error         string                 `protobuf:"bytes,3,opt,name=error,proto3" json:"error,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeleteConfigReply) Reset() {
+	*x = DeleteConfigReply{}
+	mi := &file_agent_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeleteConfigReply) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteConfigReply) ProtoMessage() {}
+
+func (x *DeleteConfigReply) ProtoReflect() protoreflect.Message {
+	mi := &file_agent_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteConfigReply.ProtoReflect.Descriptor instead.
+func (*DeleteConfigReply) Descriptor() ([]byte, []int) {
+	return file_agent_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *DeleteConfigReply) GetOk() bool {
+	if x != nil {
+		return x.Ok
+	}
+	return false
+}
+
+func (x *DeleteConfigReply) GetBackupRef() string {
+	if x != nil {
+		return x.BackupRef
+	}
+	return ""
+}
+
+func (x *DeleteConfigReply) GetError() string {
+	if x != nil {
+		return x.Error
+	}
+	return ""
+}
+
 type TestConfigRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	unknownFields protoimpl.UnknownFields
@@ -713,7 +833,7 @@ type TestConfigRequest struct {
 
 func (x *TestConfigRequest) Reset() {
 	*x = TestConfigRequest{}
-	mi := &file_agent_proto_msgTypes[13]
+	mi := &file_agent_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -725,7 +845,7 @@ func (x *TestConfigRequest) String() string {
 func (*TestConfigRequest) ProtoMessage() {}
 
 func (x *TestConfigRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_agent_proto_msgTypes[13]
+	mi := &file_agent_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -738,7 +858,7 @@ func (x *TestConfigRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TestConfigRequest.ProtoReflect.Descriptor instead.
 func (*TestConfigRequest) Descriptor() ([]byte, []int) {
-	return file_agent_proto_rawDescGZIP(), []int{13}
+	return file_agent_proto_rawDescGZIP(), []int{15}
 }
 
 type TestConfigReply struct {
@@ -751,7 +871,7 @@ type TestConfigReply struct {
 
 func (x *TestConfigReply) Reset() {
 	*x = TestConfigReply{}
-	mi := &file_agent_proto_msgTypes[14]
+	mi := &file_agent_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -763,7 +883,7 @@ func (x *TestConfigReply) String() string {
 func (*TestConfigReply) ProtoMessage() {}
 
 func (x *TestConfigReply) ProtoReflect() protoreflect.Message {
-	mi := &file_agent_proto_msgTypes[14]
+	mi := &file_agent_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -776,7 +896,7 @@ func (x *TestConfigReply) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TestConfigReply.ProtoReflect.Descriptor instead.
 func (*TestConfigReply) Descriptor() ([]byte, []int) {
-	return file_agent_proto_rawDescGZIP(), []int{14}
+	return file_agent_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *TestConfigReply) GetOk() bool {
@@ -801,7 +921,7 @@ type ReloadRequest struct {
 
 func (x *ReloadRequest) Reset() {
 	*x = ReloadRequest{}
-	mi := &file_agent_proto_msgTypes[15]
+	mi := &file_agent_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -813,7 +933,7 @@ func (x *ReloadRequest) String() string {
 func (*ReloadRequest) ProtoMessage() {}
 
 func (x *ReloadRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_agent_proto_msgTypes[15]
+	mi := &file_agent_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -826,7 +946,7 @@ func (x *ReloadRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReloadRequest.ProtoReflect.Descriptor instead.
 func (*ReloadRequest) Descriptor() ([]byte, []int) {
-	return file_agent_proto_rawDescGZIP(), []int{15}
+	return file_agent_proto_rawDescGZIP(), []int{17}
 }
 
 type ReloadReply struct {
@@ -839,7 +959,7 @@ type ReloadReply struct {
 
 func (x *ReloadReply) Reset() {
 	*x = ReloadReply{}
-	mi := &file_agent_proto_msgTypes[16]
+	mi := &file_agent_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -851,7 +971,7 @@ func (x *ReloadReply) String() string {
 func (*ReloadReply) ProtoMessage() {}
 
 func (x *ReloadReply) ProtoReflect() protoreflect.Message {
-	mi := &file_agent_proto_msgTypes[16]
+	mi := &file_agent_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -864,7 +984,7 @@ func (x *ReloadReply) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReloadReply.ProtoReflect.Descriptor instead.
 func (*ReloadReply) Descriptor() ([]byte, []int) {
-	return file_agent_proto_rawDescGZIP(), []int{16}
+	return file_agent_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *ReloadReply) GetOk() bool {
@@ -894,7 +1014,7 @@ type Backup struct {
 
 func (x *Backup) Reset() {
 	*x = Backup{}
-	mi := &file_agent_proto_msgTypes[17]
+	mi := &file_agent_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -906,7 +1026,7 @@ func (x *Backup) String() string {
 func (*Backup) ProtoMessage() {}
 
 func (x *Backup) ProtoReflect() protoreflect.Message {
-	mi := &file_agent_proto_msgTypes[17]
+	mi := &file_agent_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -919,7 +1039,7 @@ func (x *Backup) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Backup.ProtoReflect.Descriptor instead.
 func (*Backup) Descriptor() ([]byte, []int) {
-	return file_agent_proto_rawDescGZIP(), []int{17}
+	return file_agent_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *Backup) GetBackupRef() string {
@@ -966,7 +1086,7 @@ type ListBackupsRequest struct {
 
 func (x *ListBackupsRequest) Reset() {
 	*x = ListBackupsRequest{}
-	mi := &file_agent_proto_msgTypes[18]
+	mi := &file_agent_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -978,7 +1098,7 @@ func (x *ListBackupsRequest) String() string {
 func (*ListBackupsRequest) ProtoMessage() {}
 
 func (x *ListBackupsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_agent_proto_msgTypes[18]
+	mi := &file_agent_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -991,7 +1111,7 @@ func (x *ListBackupsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListBackupsRequest.ProtoReflect.Descriptor instead.
 func (*ListBackupsRequest) Descriptor() ([]byte, []int) {
-	return file_agent_proto_rawDescGZIP(), []int{18}
+	return file_agent_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *ListBackupsRequest) GetLogicalPath() string {
@@ -1010,7 +1130,7 @@ type ListBackupsReply struct {
 
 func (x *ListBackupsReply) Reset() {
 	*x = ListBackupsReply{}
-	mi := &file_agent_proto_msgTypes[19]
+	mi := &file_agent_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1022,7 +1142,7 @@ func (x *ListBackupsReply) String() string {
 func (*ListBackupsReply) ProtoMessage() {}
 
 func (x *ListBackupsReply) ProtoReflect() protoreflect.Message {
-	mi := &file_agent_proto_msgTypes[19]
+	mi := &file_agent_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1035,7 +1155,7 @@ func (x *ListBackupsReply) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListBackupsReply.ProtoReflect.Descriptor instead.
 func (*ListBackupsReply) Descriptor() ([]byte, []int) {
-	return file_agent_proto_rawDescGZIP(), []int{19}
+	return file_agent_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *ListBackupsReply) GetBackups() []*Backup {
@@ -1055,7 +1175,7 @@ type RollbackRequest struct {
 
 func (x *RollbackRequest) Reset() {
 	*x = RollbackRequest{}
-	mi := &file_agent_proto_msgTypes[20]
+	mi := &file_agent_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1067,7 +1187,7 @@ func (x *RollbackRequest) String() string {
 func (*RollbackRequest) ProtoMessage() {}
 
 func (x *RollbackRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_agent_proto_msgTypes[20]
+	mi := &file_agent_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1080,7 +1200,7 @@ func (x *RollbackRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RollbackRequest.ProtoReflect.Descriptor instead.
 func (*RollbackRequest) Descriptor() ([]byte, []int) {
-	return file_agent_proto_rawDescGZIP(), []int{20}
+	return file_agent_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *RollbackRequest) GetBackupRef() string {
@@ -1108,7 +1228,7 @@ type RollbackReply struct {
 
 func (x *RollbackReply) Reset() {
 	*x = RollbackReply{}
-	mi := &file_agent_proto_msgTypes[21]
+	mi := &file_agent_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1120,7 +1240,7 @@ func (x *RollbackReply) String() string {
 func (*RollbackReply) ProtoMessage() {}
 
 func (x *RollbackReply) ProtoReflect() protoreflect.Message {
-	mi := &file_agent_proto_msgTypes[21]
+	mi := &file_agent_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1133,7 +1253,7 @@ func (x *RollbackReply) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RollbackReply.ProtoReflect.Descriptor instead.
 func (*RollbackReply) Descriptor() ([]byte, []int) {
-	return file_agent_proto_rawDescGZIP(), []int{21}
+	return file_agent_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *RollbackReply) GetOk() bool {
@@ -1165,7 +1285,7 @@ type GetAgentSettingsRequest struct {
 
 func (x *GetAgentSettingsRequest) Reset() {
 	*x = GetAgentSettingsRequest{}
-	mi := &file_agent_proto_msgTypes[22]
+	mi := &file_agent_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1177,7 +1297,7 @@ func (x *GetAgentSettingsRequest) String() string {
 func (*GetAgentSettingsRequest) ProtoMessage() {}
 
 func (x *GetAgentSettingsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_agent_proto_msgTypes[22]
+	mi := &file_agent_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1190,7 +1310,7 @@ func (x *GetAgentSettingsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetAgentSettingsRequest.ProtoReflect.Descriptor instead.
 func (*GetAgentSettingsRequest) Descriptor() ([]byte, []int) {
-	return file_agent_proto_rawDescGZIP(), []int{22}
+	return file_agent_proto_rawDescGZIP(), []int{24}
 }
 
 type UpdateAgentSettingsRequest struct {
@@ -1204,7 +1324,7 @@ type UpdateAgentSettingsRequest struct {
 
 func (x *UpdateAgentSettingsRequest) Reset() {
 	*x = UpdateAgentSettingsRequest{}
-	mi := &file_agent_proto_msgTypes[23]
+	mi := &file_agent_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1216,7 +1336,7 @@ func (x *UpdateAgentSettingsRequest) String() string {
 func (*UpdateAgentSettingsRequest) ProtoMessage() {}
 
 func (x *UpdateAgentSettingsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_agent_proto_msgTypes[23]
+	mi := &file_agent_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1229,7 +1349,7 @@ func (x *UpdateAgentSettingsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateAgentSettingsRequest.ProtoReflect.Descriptor instead.
 func (*UpdateAgentSettingsRequest) Descriptor() ([]byte, []int) {
-	return file_agent_proto_rawDescGZIP(), []int{23}
+	return file_agent_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *UpdateAgentSettingsRequest) GetBackupRetain() int32 {
@@ -1264,7 +1384,7 @@ type AgentSettingsReply struct {
 
 func (x *AgentSettingsReply) Reset() {
 	*x = AgentSettingsReply{}
-	mi := &file_agent_proto_msgTypes[24]
+	mi := &file_agent_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1276,7 +1396,7 @@ func (x *AgentSettingsReply) String() string {
 func (*AgentSettingsReply) ProtoMessage() {}
 
 func (x *AgentSettingsReply) ProtoReflect() protoreflect.Message {
-	mi := &file_agent_proto_msgTypes[24]
+	mi := &file_agent_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1289,7 +1409,7 @@ func (x *AgentSettingsReply) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AgentSettingsReply.ProtoReflect.Descriptor instead.
 func (*AgentSettingsReply) Descriptor() ([]byte, []int) {
-	return file_agent_proto_rawDescGZIP(), []int{24}
+	return file_agent_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *AgentSettingsReply) GetBackupRetain() int32 {
@@ -1364,7 +1484,17 @@ const file_agent_proto_rawDesc = "" +
 	"\n" +
 	"backup_ref\x18\x02 \x01(\tR\tbackupRef\x12!\n" +
 	"\fnew_checksum\x18\x03 \x01(\tR\vnewChecksum\x12\x14\n" +
-	"\x05error\x18\x04 \x01(\tR\x05error\"\x13\n" +
+	"\x05error\x18\x04 \x01(\tR\x05error\"o\n" +
+	"\x13DeleteConfigRequest\x12!\n" +
+	"\flogical_path\x18\x01 \x01(\tR\vlogicalPath\x12\x14\n" +
+	"\x05actor\x18\x02 \x01(\tR\x05actor\x12\x1f\n" +
+	"\vauto_backup\x18\x03 \x01(\bR\n" +
+	"autoBackup\"X\n" +
+	"\x11DeleteConfigReply\x12\x0e\n" +
+	"\x02ok\x18\x01 \x01(\bR\x02ok\x12\x1d\n" +
+	"\n" +
+	"backup_ref\x18\x02 \x01(\tR\tbackupRef\x12\x14\n" +
+	"\x05error\x18\x03 \x01(\tR\x05error\"\x13\n" +
 	"\x11TestConfigRequest\"9\n" +
 	"\x0fTestConfigReply\x12\x0e\n" +
 	"\x02ok\x18\x01 \x01(\bR\x02ok\x12\x16\n" +
@@ -1400,7 +1530,7 @@ const file_agent_proto_rawDesc = "" +
 	"\x12AgentSettingsReply\x12#\n" +
 	"\rbackup_retain\x18\x01 \x01(\x05R\fbackupRetain\x12*\n" +
 	"\x11allow_main_config\x18\x02 \x01(\bR\x0fallowMainConfig\x127\n" +
-	"\x18allow_main_config_remote\x18\x03 \x01(\bR\x15allowMainConfigRemote2\xcf\a\n" +
+	"\x18allow_main_config_remote\x18\x03 \x01(\bR\x15allowMainConfigRemote2\xa5\b\n" +
 	"\fAgentService\x12<\n" +
 	"\x04Ping\x12\x1a.nginxadmin.v1.PingRequest\x1a\x18.nginxadmin.v1.PingReply\x12E\n" +
 	"\tGetStatus\x12\x1c.nginxadmin.v1.StatusRequest\x1a\x1a.nginxadmin.v1.StatusReply\x12O\n" +
@@ -1408,7 +1538,8 @@ const file_agent_proto_rawDesc = "" +
 	"\vListConfigs\x12!.nginxadmin.v1.ListConfigsRequest\x1a\x1f.nginxadmin.v1.ListConfigsReply\x12N\n" +
 	"\n" +
 	"ReadConfig\x12 .nginxadmin.v1.ReadConfigRequest\x1a\x1e.nginxadmin.v1.ReadConfigReply\x12Q\n" +
-	"\vWriteConfig\x12!.nginxadmin.v1.WriteConfigRequest\x1a\x1f.nginxadmin.v1.WriteConfigReply\x12N\n" +
+	"\vWriteConfig\x12!.nginxadmin.v1.WriteConfigRequest\x1a\x1f.nginxadmin.v1.WriteConfigReply\x12T\n" +
+	"\fDeleteConfig\x12\".nginxadmin.v1.DeleteConfigRequest\x1a .nginxadmin.v1.DeleteConfigReply\x12N\n" +
 	"\n" +
 	"TestConfig\x12 .nginxadmin.v1.TestConfigRequest\x1a\x1e.nginxadmin.v1.TestConfigReply\x12B\n" +
 	"\x06Reload\x12\x1c.nginxadmin.v1.ReloadRequest\x1a\x1a.nginxadmin.v1.ReloadReply\x12Q\n" +
@@ -1429,7 +1560,7 @@ func file_agent_proto_rawDescGZIP() []byte {
 	return file_agent_proto_rawDescData
 }
 
-var file_agent_proto_msgTypes = make([]protoimpl.MessageInfo, 25)
+var file_agent_proto_msgTypes = make([]protoimpl.MessageInfo, 27)
 var file_agent_proto_goTypes = []any{
 	(*PingRequest)(nil),                // 0: nginxadmin.v1.PingRequest
 	(*PingReply)(nil),                  // 1: nginxadmin.v1.PingReply
@@ -1444,49 +1575,53 @@ var file_agent_proto_goTypes = []any{
 	(*ReadConfigReply)(nil),            // 10: nginxadmin.v1.ReadConfigReply
 	(*WriteConfigRequest)(nil),         // 11: nginxadmin.v1.WriteConfigRequest
 	(*WriteConfigReply)(nil),           // 12: nginxadmin.v1.WriteConfigReply
-	(*TestConfigRequest)(nil),          // 13: nginxadmin.v1.TestConfigRequest
-	(*TestConfigReply)(nil),            // 14: nginxadmin.v1.TestConfigReply
-	(*ReloadRequest)(nil),              // 15: nginxadmin.v1.ReloadRequest
-	(*ReloadReply)(nil),                // 16: nginxadmin.v1.ReloadReply
-	(*Backup)(nil),                     // 17: nginxadmin.v1.Backup
-	(*ListBackupsRequest)(nil),         // 18: nginxadmin.v1.ListBackupsRequest
-	(*ListBackupsReply)(nil),           // 19: nginxadmin.v1.ListBackupsReply
-	(*RollbackRequest)(nil),            // 20: nginxadmin.v1.RollbackRequest
-	(*RollbackReply)(nil),              // 21: nginxadmin.v1.RollbackReply
-	(*GetAgentSettingsRequest)(nil),    // 22: nginxadmin.v1.GetAgentSettingsRequest
-	(*UpdateAgentSettingsRequest)(nil), // 23: nginxadmin.v1.UpdateAgentSettingsRequest
-	(*AgentSettingsReply)(nil),         // 24: nginxadmin.v1.AgentSettingsReply
+	(*DeleteConfigRequest)(nil),        // 13: nginxadmin.v1.DeleteConfigRequest
+	(*DeleteConfigReply)(nil),          // 14: nginxadmin.v1.DeleteConfigReply
+	(*TestConfigRequest)(nil),          // 15: nginxadmin.v1.TestConfigRequest
+	(*TestConfigReply)(nil),            // 16: nginxadmin.v1.TestConfigReply
+	(*ReloadRequest)(nil),              // 17: nginxadmin.v1.ReloadRequest
+	(*ReloadReply)(nil),                // 18: nginxadmin.v1.ReloadReply
+	(*Backup)(nil),                     // 19: nginxadmin.v1.Backup
+	(*ListBackupsRequest)(nil),         // 20: nginxadmin.v1.ListBackupsRequest
+	(*ListBackupsReply)(nil),           // 21: nginxadmin.v1.ListBackupsReply
+	(*RollbackRequest)(nil),            // 22: nginxadmin.v1.RollbackRequest
+	(*RollbackReply)(nil),              // 23: nginxadmin.v1.RollbackReply
+	(*GetAgentSettingsRequest)(nil),    // 24: nginxadmin.v1.GetAgentSettingsRequest
+	(*UpdateAgentSettingsRequest)(nil), // 25: nginxadmin.v1.UpdateAgentSettingsRequest
+	(*AgentSettingsReply)(nil),         // 26: nginxadmin.v1.AgentSettingsReply
 }
 var file_agent_proto_depIdxs = []int32{
 	4,  // 0: nginxadmin.v1.DiscoverReply.files:type_name -> nginxadmin.v1.ConfigFile
 	4,  // 1: nginxadmin.v1.ListConfigsReply.files:type_name -> nginxadmin.v1.ConfigFile
-	17, // 2: nginxadmin.v1.ListBackupsReply.backups:type_name -> nginxadmin.v1.Backup
+	19, // 2: nginxadmin.v1.ListBackupsReply.backups:type_name -> nginxadmin.v1.Backup
 	0,  // 3: nginxadmin.v1.AgentService.Ping:input_type -> nginxadmin.v1.PingRequest
 	2,  // 4: nginxadmin.v1.AgentService.GetStatus:input_type -> nginxadmin.v1.StatusRequest
 	5,  // 5: nginxadmin.v1.AgentService.DiscoverConfigs:input_type -> nginxadmin.v1.DiscoverRequest
 	7,  // 6: nginxadmin.v1.AgentService.ListConfigs:input_type -> nginxadmin.v1.ListConfigsRequest
 	9,  // 7: nginxadmin.v1.AgentService.ReadConfig:input_type -> nginxadmin.v1.ReadConfigRequest
 	11, // 8: nginxadmin.v1.AgentService.WriteConfig:input_type -> nginxadmin.v1.WriteConfigRequest
-	13, // 9: nginxadmin.v1.AgentService.TestConfig:input_type -> nginxadmin.v1.TestConfigRequest
-	15, // 10: nginxadmin.v1.AgentService.Reload:input_type -> nginxadmin.v1.ReloadRequest
-	18, // 11: nginxadmin.v1.AgentService.ListBackups:input_type -> nginxadmin.v1.ListBackupsRequest
-	20, // 12: nginxadmin.v1.AgentService.Rollback:input_type -> nginxadmin.v1.RollbackRequest
-	22, // 13: nginxadmin.v1.AgentService.GetAgentSettings:input_type -> nginxadmin.v1.GetAgentSettingsRequest
-	23, // 14: nginxadmin.v1.AgentService.UpdateAgentSettings:input_type -> nginxadmin.v1.UpdateAgentSettingsRequest
-	1,  // 15: nginxadmin.v1.AgentService.Ping:output_type -> nginxadmin.v1.PingReply
-	3,  // 16: nginxadmin.v1.AgentService.GetStatus:output_type -> nginxadmin.v1.StatusReply
-	6,  // 17: nginxadmin.v1.AgentService.DiscoverConfigs:output_type -> nginxadmin.v1.DiscoverReply
-	8,  // 18: nginxadmin.v1.AgentService.ListConfigs:output_type -> nginxadmin.v1.ListConfigsReply
-	10, // 19: nginxadmin.v1.AgentService.ReadConfig:output_type -> nginxadmin.v1.ReadConfigReply
-	12, // 20: nginxadmin.v1.AgentService.WriteConfig:output_type -> nginxadmin.v1.WriteConfigReply
-	14, // 21: nginxadmin.v1.AgentService.TestConfig:output_type -> nginxadmin.v1.TestConfigReply
-	16, // 22: nginxadmin.v1.AgentService.Reload:output_type -> nginxadmin.v1.ReloadReply
-	19, // 23: nginxadmin.v1.AgentService.ListBackups:output_type -> nginxadmin.v1.ListBackupsReply
-	21, // 24: nginxadmin.v1.AgentService.Rollback:output_type -> nginxadmin.v1.RollbackReply
-	24, // 25: nginxadmin.v1.AgentService.GetAgentSettings:output_type -> nginxadmin.v1.AgentSettingsReply
-	24, // 26: nginxadmin.v1.AgentService.UpdateAgentSettings:output_type -> nginxadmin.v1.AgentSettingsReply
-	15, // [15:27] is the sub-list for method output_type
-	3,  // [3:15] is the sub-list for method input_type
+	13, // 9: nginxadmin.v1.AgentService.DeleteConfig:input_type -> nginxadmin.v1.DeleteConfigRequest
+	15, // 10: nginxadmin.v1.AgentService.TestConfig:input_type -> nginxadmin.v1.TestConfigRequest
+	17, // 11: nginxadmin.v1.AgentService.Reload:input_type -> nginxadmin.v1.ReloadRequest
+	20, // 12: nginxadmin.v1.AgentService.ListBackups:input_type -> nginxadmin.v1.ListBackupsRequest
+	22, // 13: nginxadmin.v1.AgentService.Rollback:input_type -> nginxadmin.v1.RollbackRequest
+	24, // 14: nginxadmin.v1.AgentService.GetAgentSettings:input_type -> nginxadmin.v1.GetAgentSettingsRequest
+	25, // 15: nginxadmin.v1.AgentService.UpdateAgentSettings:input_type -> nginxadmin.v1.UpdateAgentSettingsRequest
+	1,  // 16: nginxadmin.v1.AgentService.Ping:output_type -> nginxadmin.v1.PingReply
+	3,  // 17: nginxadmin.v1.AgentService.GetStatus:output_type -> nginxadmin.v1.StatusReply
+	6,  // 18: nginxadmin.v1.AgentService.DiscoverConfigs:output_type -> nginxadmin.v1.DiscoverReply
+	8,  // 19: nginxadmin.v1.AgentService.ListConfigs:output_type -> nginxadmin.v1.ListConfigsReply
+	10, // 20: nginxadmin.v1.AgentService.ReadConfig:output_type -> nginxadmin.v1.ReadConfigReply
+	12, // 21: nginxadmin.v1.AgentService.WriteConfig:output_type -> nginxadmin.v1.WriteConfigReply
+	14, // 22: nginxadmin.v1.AgentService.DeleteConfig:output_type -> nginxadmin.v1.DeleteConfigReply
+	16, // 23: nginxadmin.v1.AgentService.TestConfig:output_type -> nginxadmin.v1.TestConfigReply
+	18, // 24: nginxadmin.v1.AgentService.Reload:output_type -> nginxadmin.v1.ReloadReply
+	21, // 25: nginxadmin.v1.AgentService.ListBackups:output_type -> nginxadmin.v1.ListBackupsReply
+	23, // 26: nginxadmin.v1.AgentService.Rollback:output_type -> nginxadmin.v1.RollbackReply
+	26, // 27: nginxadmin.v1.AgentService.GetAgentSettings:output_type -> nginxadmin.v1.AgentSettingsReply
+	26, // 28: nginxadmin.v1.AgentService.UpdateAgentSettings:output_type -> nginxadmin.v1.AgentSettingsReply
+	16, // [16:29] is the sub-list for method output_type
+	3,  // [3:16] is the sub-list for method input_type
 	3,  // [3:3] is the sub-list for extension type_name
 	3,  // [3:3] is the sub-list for extension extendee
 	0,  // [0:3] is the sub-list for field type_name
@@ -1503,7 +1638,7 @@ func file_agent_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_agent_proto_rawDesc), len(file_agent_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   25,
+			NumMessages:   27,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

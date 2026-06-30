@@ -466,6 +466,36 @@ func (s *Server) handleWriteConfig(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"ok": true, "new_checksum": rep.GetNewChecksum(), "backup_ref": rep.GetBackupRef()})
 }
 
+func (s *Server) handleDeleteConfig(c *gin.Context) {
+	srv := s.mustServer(c)
+	if srv == nil {
+		return
+	}
+	path := c.Query("path")
+	if path == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "缺少 path 参数"})
+		return
+	}
+	claims := currentClaims(c)
+	rep, err := s.agents.DeleteConfig(c.Request.Context(), srv.Address, &pb.DeleteConfigRequest{
+		LogicalPath: path,
+		Actor:       claims.Username,
+		AutoBackup:  true,
+	})
+	if err != nil {
+		c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
+		return
+	}
+	if !rep.GetOk() {
+		s.audit(claims.UserID, srv.ID, "config.delete", path, "failed", rep.GetError())
+		c.JSON(http.StatusBadRequest, gin.H{"ok": false, "error": rep.GetError()})
+		return
+	}
+	_ = s.store.DeleteConfigFile(srv.ID, path)
+	s.audit(claims.UserID, srv.ID, "config.delete", path, "success", "")
+	c.JSON(http.StatusOK, gin.H{"ok": true, "backup_ref": rep.GetBackupRef()})
+}
+
 func (s *Server) handleTest(c *gin.Context) {
 	srv := s.mustServer(c)
 	if srv == nil {

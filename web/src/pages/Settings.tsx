@@ -217,6 +217,29 @@ function DisplaySettings() {
             ))}
           </div>
         </SettingRow>
+
+        <SettingRow label="颜色主题">
+          <div className="flex gap-2">
+            {(
+              [
+                { v: "light" as const, label: "浅色" },
+                { v: "dark" as const, label: "深色" },
+              ] as const
+            ).map((o) => (
+              <button
+                key={o.v}
+                onClick={() => setPrefs({ theme: o.v })}
+                className={`rounded-md border px-3 py-1.5 text-sm transition ${
+                  prefs.theme === o.v
+                    ? "border-brand-500 bg-brand-50 text-brand-700 dark:bg-brand-950 dark:text-brand-300"
+                    : "border-slate-300 text-slate-600 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300"
+                }`}
+              >
+                {o.label}
+              </button>
+            ))}
+          </div>
+        </SettingRow>
       </SettingCard>
 
       <SettingCard title="源码编辑器" desc="配置文件源码模式的显示效果。">

@@ -11,7 +11,8 @@ type Variant =
 
 const styles: Record<Variant, string> = {
   primary: "bg-brand-600 text-white hover:bg-brand-700",
-  secondary: "bg-white text-slate-700 border border-slate-300 hover:bg-slate-50",
+  secondary:
+    "bg-white text-slate-700 border border-slate-300 hover:bg-slate-50 dark:bg-slate-800 dark:text-slate-200 dark:border-slate-600 dark:hover:bg-slate-700",
   danger: "bg-red-600 text-white hover:bg-red-700",
   ghost: "text-slate-600 hover:bg-slate-100",
   info: "bg-sky-600 text-white hover:bg-sky-700",
@@ -99,10 +100,10 @@ export function SettingCard({
   children: ReactNode;
 }) {
   return (
-    <section className="rounded-xl border border-slate-200 bg-white shadow-sm">
-      <div className="border-b border-slate-100 px-5 py-4">
-        <h2 className="text-sm font-semibold text-slate-800">{title}</h2>
-        {desc && <p className="mt-0.5 text-xs text-slate-500">{desc}</p>}
+    <section className="rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
+      <div className="border-b border-slate-100 px-5 py-4 dark:border-slate-800">
+        <h2 className="text-sm font-semibold text-slate-800 dark:text-slate-100">{title}</h2>
+        {desc && <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{desc}</p>}
       </div>
       <div className="divide-y divide-slate-100">{children}</div>
     </section>
@@ -122,7 +123,7 @@ export function SettingRow({
   return (
     <div className="flex items-center justify-between gap-4 px-5 py-4">
       <div className="min-w-0">
-        <div className="text-sm font-medium text-slate-700">{label}</div>
+        <div className="text-sm font-medium text-slate-700 dark:text-slate-200">{label}</div>
         {desc && <div className="mt-0.5 text-xs text-slate-400">{desc}</div>}
       </div>
       <div className="shrink-0">{children}</div>

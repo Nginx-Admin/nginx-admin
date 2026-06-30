@@ -9,55 +9,51 @@
 web/
 ├── index.html
 ├── package.json / vite.config.ts / tsconfig.json / tailwind.config.js / postcss.config.js
-├── embed.go                # Go 侧：go:embed all:dist
-├── dist/                   # 构建产物（占位，build 后覆盖）
+├── embed.go
+├── dist/
 └── src/
-    ├── main.tsx            # 入口 + 路由（HashRouter）
-    ├── index.css           # Tailwind 指令 + 全局样式
-    ├── api/client.ts       # 后端 REST API 封装（带 JWT）
-    ├── auth/AuthContext.tsx# 登录态 / 路由守卫
-    ├── components/         # Layout 侧边栏、通用 UI
+    ├── main.tsx
+    ├── index.css
+    ├── api/client.ts
+    ├── auth/AuthContext.tsx
+    ├── components/         # Layout、SourceEditor、DiffView、ui
     ├── pages/              # Login / Servers / ServerDetail / ConfigEditor / Audit / Users / Settings
-    └── canvas/             # 节点式画布核心
-        ├── directives.ts   # crossplane 指令树辅助（增删改、块模板）
-        ├── nodes.tsx       # Server/Location/Upstream 自定义节点
-        ├── Canvas.tsx      # 指令树 → React Flow nodes/edges
-        └── PropertyPanel.tsx # 选中块的属性编辑 + 快捷添加 server/location/upstream
+    ├── utils/diff.ts       # 行级 diff
+    └── canvas/
+        ├── directives.ts   # crossplane 指令树辅助
+        ├── matcher.ts      # 流量模拟（location 匹配）
+        ├── nodes.tsx
+        ├── Canvas.tsx
+        └── PropertyPanel.tsx
 ```
 
 ## 开发与构建
 
 ```bash
 cd web
-npm install          # 首次安装依赖
-npm run dev          # 开发服务器 :5173，/api 自动代理到后端 :8080
-npm run build        # 类型检查 + 构建到 dist/
+npm install
+npm run dev          # :5173，/api 代理到 :8080
+npm run build
 ```
 
-构建完成后回到项目根目录重新编译 Go 即可内嵌前端：
+## 画布与编辑器
 
-```bash
-cd ..
-go build -o bin/nginx-admin ./cmd/nginx-admin
-```
+- **解析/回写**：后端 crossplane（`POST /api/nginx/parse`、`/api/nginx/build`）
+- **双模式**：画布 + 源码（语法高亮、行号）
+- **流量模拟**：Host + URI → 匹配 location，画布高亮
+- **变更对比**：相对上次加载的行级 diff
+- **快照/回滚**：Agent 本地备份
+- **删除配置**：详情页子配置「删除」（需 Agent 支持 `DeleteConfig`）
+- **主题**：设置页切换浅色/深色
 
-> 未构建前端时，`dist/` 仅有占位页，后端会返回提示页；不影响后端 API 运行。
-
-## 画布说明
-
-- **解析/回写**：走后端 crossplane 接口（`POST /api/nginx/parse`、`/api/nginx/build`），注释与复杂指令保真。
-- **双模式**：画布可视化 + 源码直接编辑，保存时统一走 Agent 安全闭环（快照 → 写入 → nginx -t → reload）。
-- **快捷添块**：画布左上角可添加顶层 Server/Upstream；属性面板内可按块类型添加 Server/Location/Upstream。
-- **快照**：编辑器顶栏「快照」可查看 Agent 本地备份并一键回滚。
-
-## 功能对应页面
+## 页面路由
 
 | 路由 | 功能 |
 |------|------|
 | `#/login` | 登录 |
-| `#/` | 服务器列表（分组、刷新全部状态、纳管时测试 Agent 连通） |
-| `#/servers/:id` | 详情（状态、配置发现、nginx -t、reload、新建子配置） |
-| `#/servers/:id/edit?path=` | 配置编辑器（画布/源码、快照回滚） |
-| `#/audit` | 操作审计（用户名/服务器名、搜索） |
+| `#/` | 服务列表 |
+| `#/servers/:id` | 详情（站点名、PID、删除子配置） |
+| `#/servers/:id/edit?path=` | 配置编辑器 |
+| `#/audit` | 操作审计 |
 | `#/users` | 用户管理（admin） |
-| `#/settings` | 改密码、中心备份策略（admin）、界面外观 |
+| `#/settings` | 改密、备份策略、外观与主题 |

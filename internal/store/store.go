@@ -181,6 +181,10 @@ func (s *Store) ListConfigFiles(serverID string) ([]model.ConfigFile, error) {
 	return rows, err
 }
 
+func (s *Store) DeleteConfigFile(serverID, logicalPath string) error {
+	return s.db.Delete(&model.ConfigFile{}, "server_id = ? AND logical_path = ?", serverID, logicalPath).Error
+}
+
 // BatchUpsertConfigFiles 一次性 upsert 多个配置文件索引（单次往返）。
 // 用于配置发现：避免逐个 select+insert 造成大量网络往返。
 func (s *Store) BatchUpsertConfigFiles(serverID string, files map[string]string) error {

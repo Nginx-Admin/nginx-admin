@@ -28,6 +28,7 @@ export default function ServerDetail() {
   const [busy, setBusy] = useState(false);
   const [showCreateConfig, setShowCreateConfig] = useState(false);
   const [statusRefreshing, setStatusRefreshing] = useState(false);
+  const [serverNames, setServerNames] = useState<string[]>([]);
 
   // 子配置列表容器（用于保持/恢复滚动位置）
   const subListRef = useRef<HTMLDivElement>(null);
@@ -116,7 +117,8 @@ export default function ServerDetail() {
     try {
       const r = await api.discover(id);
       setFiles(r.files || []);
-      setMsg(`发现 ${r.files?.length || 0} 个配置文件，站点：${r.server_names?.join(", ") || "—"}`);
+      setServerNames(r.server_names || []);
+      setMsg(`发现 ${r.files?.length || 0} 个配置文件`);
     } catch (e) {
       setErr((e as Error).message);
     } finally {
@@ -156,6 +158,11 @@ export default function ServerDetail() {
 
   return (
     <div className="p-6">
+      {!canEdit && (
+        <div className="mb-3 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
+          只读模式：您当前为 viewer 角色，无法编辑配置或执行 reload。
+        </div>
+      )}
       <button
         onClick={() => nav("/")}
         className="mb-3 inline-flex items-center rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-50"
@@ -181,8 +188,7 @@ export default function ServerDetail() {
         </div>
       </div>
 
-      {/* 状态卡片 */}
-      <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
         <StatCard label="连接状态" value={statusBadge(server?.status || "unknown")} />
         <StatCard
           label="nginx 进程"
@@ -195,6 +201,10 @@ export default function ServerDetail() {
               <span className="text-red-600">未运行</span>
             )
           }
+        />
+        <StatCard
+          label="Master PID"
+          value={!status ? <Skeleton /> : status.master_pid || "—"}
         />
         <StatCard
           label="版本"
@@ -212,7 +222,46 @@ export default function ServerDetail() {
             )
           }
         />
+        <StatCard
+          label="config_root"
+          value={
+            !status ? (
+              <Skeleton />
+            ) : (
+              <span className="font-mono text-xs">{status.config_root || "—"}</span>
+            )
+          }
+        />
       </div>
+
+      {status?.last_test_output && (
+        <details className="mt-3 rounded-md border border-slate-200 bg-white p-3 text-xs dark:border-slate-700 dark:bg-slate-900">
+          <summary className="cursor-pointer text-slate-600 dark:text-slate-300">
+            最近 nginx -t 输出
+          </summary>
+          <pre className="code mt-2 whitespace-pre-wrap text-slate-600 dark:text-slate-400">
+            {status.last_test_output}
+          </pre>
+        </details>
+      )}
+
+      {serverNames.length > 0 && (
+        <div className="mt-4 rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
+          <div className="mb-2 text-sm font-medium text-slate-700 dark:text-slate-200">
+            发现站点（server_name）
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {serverNames.map((n) => (
+              <span
+                key={n}
+                className="rounded-full bg-slate-100 px-2.5 py-0.5 font-mono text-xs text-slate-700 dark:bg-slate-800 dark:text-slate-200"
+              >
+                {n}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
 
       {msg && (
         <pre className="code mt-3 whitespace-pre-wrap rounded-md bg-green-50 p-3 text-xs text-green-800">
@@ -268,6 +317,7 @@ export default function ServerDetail() {
                   canEdit={canEdit}
                   nav={nav}
                   main
+                  onDeleted={loadConfigs}
                 />
               </div>
             )}
@@ -308,6 +358,7 @@ export default function ServerDetail() {
                   id={id}
                   canEdit={canEdit}
                   nav={nav}
+                  onDeleted={loadConfigs}
                 />
               </div>
             )}
@@ -337,13 +388,31 @@ function ConfigTable({
   canEdit,
   nav,
   main = false,
+  onDeleted,
 }: {
   files: ConfigFileInfo[];
   id: string;
   canEdit: boolean;
   nav: ReturnType<typeof useNavigate>;
   main?: boolean;
+  onDeleted?: () => void;
 }) {
+  const doDelete = async (logicalPath: string) => {
+    if (
+      !confirm(
+        `确定删除配置文件 ${logicalPath}？\n将走 Agent 安全闭环（快照 → 删除 → nginx -t → reload）。`
+      )
+    )
+      return;
+    try {
+      const r = await api.deleteConfig(id, logicalPath);
+      if (r.ok) onDeleted?.();
+      else alert(r.error || "删除失败");
+    } catch (e) {
+      alert((e as Error).message);
+    }
+  };
+
   return (
     <table className="w-full text-sm">
       <thead
@@ -365,19 +434,25 @@ function ConfigTable({
               {f.lines != null ? `${f.lines} 行` : "—"}
             </td>
             <td className="px-4 py-2 text-right">
-              <Button
-                variant="secondary"
-                onClick={() =>
-                  nav(
-                    `/servers/${id}/edit?path=${encodeURIComponent(
-                      f.logical_path
-                    )}`
-                  )
-                }
-              >
-                {/* 主配置默认只读，进入后由后端控制能否保存 */}
-                {main || !canEdit ? "查看" : "编辑"}
-              </Button>
+              <div className="inline-flex gap-2">
+                <Button
+                  variant="secondary"
+                  onClick={() =>
+                    nav(
+                      `/servers/${id}/edit?path=${encodeURIComponent(
+                        f.logical_path
+                      )}`
+                    )
+                  }
+                >
+                  {main || !canEdit ? "查看" : "编辑"}
+                </Button>
+                {canEdit && !main && (
+                  <Button variant="danger" onClick={() => doDelete(f.logical_path)}>
+                    删除
+                  </Button>
+                )}
+              </div>
             </td>
           </tr>
         ))}

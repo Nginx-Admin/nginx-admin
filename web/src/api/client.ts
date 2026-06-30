@@ -245,6 +245,12 @@ export const api = {
       { backup_ref }
     ),
 
+  deleteConfig: (id: string, path: string) =>
+    request<{ ok: boolean; backup_ref?: string; error?: string }>(
+      "DELETE",
+      `/servers/${id}/config?path=${encodeURIComponent(path)}`
+    ),
+
   listAudit: () => request<{ logs: AuditLog[] }>("GET", "/audit"),
 
   parseConfig: (content: string) =>

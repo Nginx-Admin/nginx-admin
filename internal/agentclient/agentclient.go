@@ -146,6 +146,15 @@ func (c *Client) WriteConfig(ctx context.Context, address string, req *pb.WriteC
 	return cli.WriteConfig(cctx, req)
 }
 
+func (c *Client) DeleteConfig(ctx context.Context, address string, req *pb.DeleteConfigRequest) (*pb.DeleteConfigReply, error) {
+	cli, cctx, cancel, err := c.withClient(ctx, address)
+	if err != nil {
+		return nil, err
+	}
+	defer cancel()
+	return cli.DeleteConfig(cctx, req)
+}
+
 func (c *Client) TestConfig(ctx context.Context, address string) (*pb.TestConfigReply, error) {
 	cli, cctx, cancel, err := c.withClient(ctx, address)
 	if err != nil {
