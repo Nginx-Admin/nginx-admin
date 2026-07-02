@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"net/http"
+	"sort"
 	"sync"
 
 	"github.com/gin-gonic/gin"
@@ -51,6 +52,36 @@ func (s *Server) handleListConfigs(c *gin.Context) {
 		}(i, f.GetLogicalPath())
 	}
 	wg.Wait()
+
+	// 合并中心索引：新建/写入后已入库但尚未被 include 链扫到的文件（如根目录新建）
+	indexed, err := s.store.ListConfigFiles(srv.ID)
+	if err == nil {
+		seen := make(map[string]struct{}, len(out))
+		for _, f := range out {
+			seen[f.LogicalPath] = struct{}{}
+		}
+		for _, cf := range indexed {
+			if _, ok := seen[cf.LogicalPath]; ok {
+				continue
+			}
+			fi := fileInfo{
+				LogicalPath: cf.LogicalPath,
+				Checksum:    cf.Checksum,
+				Lines:       -1,
+			}
+			if r, err := s.agents.ReadConfig(c.Request.Context(), srv.Address, cf.LogicalPath); err == nil {
+				fi.Lines = countLines(r.GetContent())
+				if fi.Checksum == "" {
+					fi.Checksum = r.GetChecksum()
+				}
+				fi.Size = int64(len(r.GetContent()))
+			}
+			out = append(out, fi)
+		}
+		sort.Slice(out, func(i, j int) bool {
+			return out[i].LogicalPath < out[j].LogicalPath
+		})
+	}
 
 	c.JSON(http.StatusOK, gin.H{"files": out})
 }

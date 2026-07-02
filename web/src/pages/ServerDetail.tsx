@@ -40,13 +40,12 @@ export default function ServerDetail() {
   const mainFiles = files.filter((f) => isMainConfig(f.logical_path));
   const subFiles = files.filter((f) => !isMainConfig(f.logical_path));
 
-  // 从已发现的子配置提取去重目录集合（这些目录都是经 include 加载进来的），
-  // 供"新建子配置"选择落盘目录。
+  // 从已发现的子配置提取目录（仅 include 链上的子目录，不含 config_root 根目录）。
   const subDirs = useMemo(() => {
     const set = new Set<string>();
     for (const f of subFiles) {
       const idx = f.logical_path.lastIndexOf("/");
-      set.add(idx >= 0 ? f.logical_path.slice(0, idx) : ".");
+      if (idx >= 0) set.add(f.logical_path.slice(0, idx));
     }
     return Array.from(set).sort();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -361,7 +360,7 @@ export default function ServerDetail() {
           <div className="mt-5">
             <div className="mb-1 flex items-center justify-between">
               <h3 className="text-sm font-semibold text-slate-700">子配置</h3>
-              {canEdit && (
+              {canEdit && files.length > 0 && (
                 <div className="flex gap-2">
                   {subDirs.length > 0 && (
                     <Button
@@ -406,7 +405,19 @@ export default function ServerDetail() {
           onClose={() => setShowCreateConfig(false)}
           onCreated={(logicalPath) => {
             setShowCreateConfig(false);
-            // 直接进入编辑器编辑新建的文件
+            setFiles((prev) => {
+              if (prev.some((f) => f.logical_path === logicalPath)) return prev;
+              return [
+                ...prev,
+                {
+                  logical_path: logicalPath,
+                  size: 0,
+                  mtime_unix: Math.floor(Date.now() / 1000),
+                  checksum: "",
+                },
+              ].sort((a, b) => a.logical_path.localeCompare(b.logical_path));
+            });
+            loadConfigs();
             nav(`/servers/${id}/edit?path=${encodeURIComponent(logicalPath)}`);
           }}
           serverId={id}
@@ -544,7 +555,11 @@ function CreateConfigModal({
       return;
     }
     const fname = /\.conf$/i.test(name) ? name : name + ".conf";
-    const logicalPath = dir === "." || dir === "" ? fname : `${dir}/${fname}`;
+    if (!dir) {
+      setErr("请选择落盘目录（需先配置发现，且存在 include 加载的子目录）");
+      return;
+    }
+    const logicalPath = `${dir}/${fname}`;
 
     setBusy(true);
     setErr("");
@@ -570,6 +585,9 @@ function CreateConfigModal({
         className="flex max-h-[85vh] w-full max-w-2xl flex-col rounded-xl bg-white p-6 shadow-lg"
       >
         <h2 className="text-lg font-semibold text-slate-800">新建子配置</h2>
+        <p className="mt-1 text-xs text-slate-500">
+          仅可选择已被 nginx include 的子目录，根目录 conf 需手动编辑主配置添加 include。
+        </p>
         <div className="mt-4 flex gap-3">
           <label className="block text-sm font-medium text-slate-700">
             目录
@@ -577,10 +595,11 @@ function CreateConfigModal({
               className="mt-1 w-48 rounded-md border border-slate-300 px-3 py-2 text-sm"
               value={dir}
               onChange={(e) => setDir(e.target.value)}
+              required
             >
               {dirs.map((d) => (
                 <option key={d} value={d}>
-                  {d === "." ? "（根目录）" : d}
+                  {d}
                 </option>
               ))}
             </select>
