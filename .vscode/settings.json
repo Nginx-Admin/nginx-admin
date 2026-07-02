@@ -1,0 +1,8 @@
+{
+  "css.validate": false,
+  "css.customData": [],
+  "files.associations": {
+    "**/web/dist/**/*.css": "plaintext"
+  },
+  "css.lint.unknownAtRules": "ignore"
+}

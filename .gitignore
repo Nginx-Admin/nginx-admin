@@ -14,7 +14,8 @@ web/*.local
 
 # IDE
 .idea/
-.vscode/
+.vscode/*
+!.vscode/settings.json
 *.swp
 
 # 系统

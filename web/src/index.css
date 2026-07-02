@@ -24,7 +24,11 @@ body,
 
 body {
   font-family: var(--app-font-family);
-  @apply bg-slate-50 text-slate-800 dark:bg-slate-950 dark:text-slate-100;
+  @apply bg-slate-50 text-slate-800;
+}
+
+html.dark body {
+  @apply bg-slate-950 text-slate-100;
 }
 
 .react-flow__node {
