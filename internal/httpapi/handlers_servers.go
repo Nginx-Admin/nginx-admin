@@ -124,10 +124,16 @@ func (s *Server) handleServerStatusCached(c *gin.Context) {
 	if srv == nil {
 		return
 	}
+	nginxRunning := srv.NginxRunning
+	masterPID := srv.MasterPID
+	if srv.Status == "offline" {
+		nginxRunning = false
+		masterPID = 0
+	}
 	c.JSON(http.StatusOK, gin.H{
-		"nginx_running":    srv.NginxRunning,
+		"nginx_running":    nginxRunning,
 		"nginx_version":    srv.NginxVersion,
-		"master_pid":       srv.MasterPID,
+		"master_pid":       masterPID,
 		"config_root":      srv.ConfigRoot,
 		"last_test_ok":     srv.LastTestOk,
 		"last_test_output": "",

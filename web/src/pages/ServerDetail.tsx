@@ -34,6 +34,8 @@ export default function ServerDetail() {
   const subListRef = useRef<HTMLDivElement>(null);
 
   const canEdit = user?.role === "admin" || user?.role === "editor";
+  const connectionStatus = server?.status || "unknown";
+  const agentOnline = connectionStatus === "online";
 
   const mainFiles = files.filter((f) => isMainConfig(f.logical_path));
   const subFiles = files.filter((f) => !isMainConfig(f.logical_path));
@@ -54,32 +56,54 @@ export default function ServerDetail() {
     api.getServer(id).then(setServer).catch((e) => setErr((e as Error).message));
   }, [id]);
 
+  const markAgentOffline = useCallback(() => {
+    setStatus((prev) =>
+      prev ? { ...prev, nginx_running: false, master_pid: 0 } : prev
+    );
+    loadServer();
+  }, [loadServer]);
+
   // 实时拉取状态（打 Agent，1-2s）。手动"刷新状态"按钮调用。
   const loadStatus = useCallback(() => {
     setErr("");
     setStatusRefreshing(true);
     api
       .serverStatus(id)
-      .then(setStatus)
-      .catch((e) => setErr((e as Error).message))
+      .then((s) => {
+        setStatus(s);
+        loadServer();
+      })
+      .catch((e) => {
+        setErr((e as Error).message);
+        markAgentOffline();
+      })
       .finally(() => setStatusRefreshing(false));
-  }, [id]);
+  }, [id, loadServer, markAgentOffline]);
 
   // 进页面：先秒显缓存状态，再后台静默刷新实时状态（stale-while-revalidate）。
   const loadStatusFast = useCallback(() => {
-    // 1) 缓存秒显
     api
       .serverStatusCached(id)
-      .then((s) => setStatus((prev) => prev ?? s))
+      .then((s) =>
+        setStatus((prev) => {
+          const next = prev ?? s;
+          if (s.status === "offline") {
+            return { ...next, nginx_running: false, master_pid: 0 };
+          }
+          return prev ?? s;
+        })
+      )
       .catch(() => {});
-    // 2) 后台实时刷新
     setStatusRefreshing(true);
     api
       .serverStatus(id)
-      .then(setStatus)
-      .catch(() => {}) // 后台刷新失败不打扰，保留缓存值
+      .then((s) => {
+        setStatus(s);
+        loadServer();
+      })
+      .catch(() => markAgentOffline())
       .finally(() => setStatusRefreshing(false));
-  }, [id]);
+  }, [id, loadServer, markAgentOffline]);
 
   const loadConfigs = useCallback(() => {
     api
@@ -195,16 +219,24 @@ export default function ServerDetail() {
           value={
             !status ? (
               <Skeleton />
-            ) : status.nginx_running ? (
-              <span className="text-green-600">运行中</span>
-            ) : (
+            ) : !agentOnline || !status.nginx_running ? (
               <span className="text-red-600">未运行</span>
+            ) : (
+              <span className="text-green-600">运行中</span>
             )
           }
         />
         <StatCard
           label="Master PID"
-          value={!status ? <Skeleton /> : status.master_pid || "—"}
+          value={
+            !status ? (
+              <Skeleton />
+            ) : !agentOnline || !status.master_pid ? (
+              "—"
+            ) : (
+              status.master_pid
+            )
+          }
         />
         <StatCard
           label="版本"
@@ -215,6 +247,8 @@ export default function ServerDetail() {
           value={
             !status ? (
               <Skeleton />
+            ) : !agentOnline ? (
+              <span className="text-slate-400">—</span>
             ) : status.last_test_ok ? (
               <span className="text-green-600">通过</span>
             ) : (

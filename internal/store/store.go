@@ -149,8 +149,16 @@ func (s *Store) DeleteServer(id string) error {
 
 func (s *Store) TouchServer(id, version, status string) error {
 	now := time.Now()
-	return s.db.Model(&model.Server{}).Where("id = ?", id).
-		Updates(map[string]any{"status": status, "nginx_version": version, "last_seen_at": now}).Error
+	updates := map[string]any{
+		"status":        status,
+		"nginx_version": version,
+		"last_seen_at":  now,
+	}
+	if status == "offline" {
+		updates["nginx_running"] = false
+		updates["master_pid"] = 0
+	}
+	return s.db.Model(&model.Server{}).Where("id = ?", id).Updates(updates).Error
 }
 
 // SaveServerStatus 缓存一次完整的 Agent 状态快照（供详情页"秒显"）。

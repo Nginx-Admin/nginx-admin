@@ -47,6 +47,8 @@ export interface ServerStatus {
   config_root: string;
   last_test_ok: boolean;
   last_test_output: string;
+  status?: string;
+  cached?: boolean;
 }
 
 export interface ConfigFileInfo {
